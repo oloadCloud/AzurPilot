@@ -1228,7 +1228,7 @@ details[open]>summary::after {
    ========================================== */
 
 #pywebio-scope-log {
-	font-family: 'JetBrains Mono NL', monospace !important;
+	font-family: 'JetBrains Mono NL', 'MiSans', monospace !important;
 	font-size: 13px !important;
 	background-color: var(--alas-apple-card-bg) !important;
 	backdrop-filter: blur(20px) saturate(180%) !important;
