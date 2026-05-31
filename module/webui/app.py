@@ -379,6 +379,8 @@ class AlasGUI(Frame):
             pywebio_theme = "default"
         if theme == "apple":
             pywebio_theme = "default"
+        if theme == "children":
+            pywebio_theme = "default"
 
         webconfig(theme=pywebio_theme)
 
@@ -1008,6 +1010,26 @@ class AlasGUI(Frame):
                             "refresh_text": "#007aff",
                         }
                     )
+                elif self.theme == "children":
+                    md3_colors.update(
+                        {
+                            "toolbar_border": "rgba(255, 182, 193, .6)",
+                            "toolbar_bg": "rgba(255, 250, 240, .96)",
+                            "toolbar_shadow": "0 2px 8px rgba(255, 182, 193, .2)",
+                            "segment_border": "rgba(255, 160, 122, .4)",
+                            "segment_divider": "rgba(255, 160, 122, .2)",
+                            "segment_outline": "rgba(135, 206, 250, .4)",
+                            "segment_bg": "rgba(255, 255, 255, .8)",
+                            "text": "#6b5a59",
+                            "label": "#8e7877",
+                            "hover": "rgba(255, 192, 203, .2)",
+                            "selected_bg": "rgba(255, 182, 193, .3)",
+                            "selected_text": "#e05275",
+                            "selected_outline": "rgba(255, 182, 193, .5)",
+                            "refresh_text": "#e05275",
+                        }
+                    )
+
 
                 put_html(f"""
                 <style>
@@ -4382,31 +4404,23 @@ class AlasGUI(Frame):
                     {"label": "Dark", "value": "dark", "color": "dark"},
                     {"label": "新春 ", "value": "socialism", "color": "danger"},
                     {"label": "Apple", "value": "apple", "color": "primary"},
+                    {"label": "🧸 童趣", "value": "children", "color": "warning"},
                 ],
                 onclick=lambda t: set_theme(t),
             ).style("text-align: center")
             # show something
             put_markdown(
                 """
-            Alas 是一款免费开源软件，如果你在任何渠道付费购买了 Alas，那你一定是个被骗了的超级大杂鱼呢❤
-            Alas is free and open-source software. If you paid for Alas through any channel, please request a refund.
-            Alasは無料のオープンソースソフトウェアです。Alasをいずれかのチャネルから購入された場合は、返金をリクエストしてください。
-            Alas는 무료 오픈 소스 소프트웨어입니다. 어떤 경로로든 Alas를 유료로 구매하셨다면 환불을 요청해 주세요.
-            Alas 是一款免費開源軟體，如果您透過任何管道付費購買了 Alas，請申請退款。
+            AzurPilot 是基于上游项目 Alas (AzurLaneAutoScript) 的修改版本，采用 GPL-3.0 许可证，免费开源。如果你在任何渠道付费购买，那你一定是个大傻逼，请申请退款。
+            AzurPilot is a modified version based on the upstream project Alas (AzurLaneAutoScript), licensed under GPL-3.0, free and open-source. If you paid through any channel, please request a refund.
+            AzurPilotは上流プロジェクトAlas (AzurLaneAutoScript) の改変版で、GPL-3.0ライセンスの無料オープンソースです。購入された場合は、返金をリクエストしてください。
+            AzurPilot는 상류 프로젝트 Alas(AzurLaneAutoScript)의 수정 버전이며, GPL-3.0 라이선스의 무료 오픈 소스입니다. 구매하셨다면 환불을 요청해 주세요.
+            AzurPilot 是基於上游專案 Alas (AzurLaneAutoScript) 的修改版本，採用 GPL-3.0 許可證，免費開源。如果您透過任何管道付費購買，請申請退款。
 
-            官方项目地址 / Official project address / 公式プロジェクトアドレス / 공식 프로젝트 주소 / 官方專案位址：`https://github.com/LmeSzinc/AzurLaneAutoScript`
+            上游项目 / Upstream / 上流プロジェクト / 상류 프로젝트 / 上游專案：`https://github.com/LmeSzinc/AzurLaneAutoScript`
+            本项目 / This project / 本プロジェクト / 본 프로젝트 / 本專案：`https://github.com/wess09/AzurPilot`
 
-            您当前使用的不是官方版本 / You are not currently using the official version / 現在、公式バージョンをご利用ではありません。 / 현재 공식 버전을 사용하고 있지 않습니다. / 您目前使用的不是官方版本。
-
-            您使用的是修改版，请联系修改版的作者获取支持。 / You are using a modified version. Please contact the author of the modified version for support. / 改変版をご利用中です。サポートが必要な場合は、改変版の作者にお問い合わせください。 / 수정된 버전을 사용 중입니다. 지원이 필요하면 수정 버전의 작성자에게 문의해 주세요. / 您使用的是修改版，請聯繫修改版作者取得支援。
-
-            修改版项目地址 / Modified project address /変更後のプロジェクトアドレス / 수정된 프로젝트 주소 / 修改版專案位址：`https://github.com/wess09/AzurLaneAutoScript`
-
-            修改版问题请联系：
-            For issues related to the revised version, please contact:
-            改訂版に関する問題については、こちらへお問い合わせください。
-            수정 버전 관련 문의는 아래로 연락해 주세요.
-            修改版問題請聯絡：`https://addgroup.nanoda.work/`
+            如需支持，请联系 / For support, please contact / サポートについてはこちらへ / 지원이 필요하면 아래로 / 如需支援請聯繫：`https://addgroup.nanoda.work/`
             """
             ).style("text-align: center")
 
@@ -4551,8 +4565,91 @@ class AlasGUI(Frame):
 
         elif self.theme == "socialism":
             add_css(filepath_css("socialism-alas"))
+        elif self.theme == "children":
+            add_css(filepath_css("children-alas"))
         else:
             add_css(filepath_css("light-alas"))
+
+        # 儿童节背景 Emoji 雨自动掉落逻辑（支持所有主题）
+        current_date = datetime.now().date()
+        is_children_day = (current_date.month == 6 and current_date.day == 1)
+        
+        EMOJI_RAIN_PREVIEW = False
+        
+        if is_children_day or EMOJI_RAIN_PREVIEW:
+            run_js("""
+            (function(){
+                if (window.alasEmojiRainActive) return;
+                window.alasEmojiRainActive = true;
+                
+                var style = document.createElement('style');
+                style.innerHTML = `
+                    @keyframes emoji-fall {
+                        0% {
+                            transform: translateY(-50px) rotate(0deg);
+                            opacity: 0;
+                        }
+                        15% {
+                            opacity: 0.38;
+                        }
+                        85% {
+                            opacity: 0.38;
+                        }
+                        100% {
+                            transform: translateY(calc(100vh + 50px)) rotate(360deg);
+                            opacity: 0;
+                        }
+                    }
+                    .cute-emoji-drop {
+                        position: fixed !important;
+                        z-index: 2 !important; /* 确保在背景层，隐藏在所有卡片和边栏下方 */
+                        pointer-events: none !important;
+                        user-select: none !important;
+                        animation: emoji-fall linear forwards;
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // 精选儿童节超萌童趣 Emoji
+                var emojis = ['🧸', '💗', '🍬', '💗', '🌸', '🍒', '🌈', '🌸', '💗', '🌟', '🦄', '🌈', '🌸', '🌟', '🌸', '🌈'];
+                
+                setInterval(function(){
+                    // 若容器不存在，则停止产生新雨点
+                    if (!document.getElementById('pywebio-scope-content')) return;
+                    
+                    var emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    var span = document.createElement('span');
+                    span.className = 'cute-emoji-drop';
+                    span.textContent = emoji;
+                    
+                    // 随机横坐标位置 (0vw - 100vw)
+                    var left = Math.random() * 100;
+                    span.style.left = left + 'vw';
+                    span.style.top = '-50px';
+                    
+                    // 随机下落时间 (8秒 - 14秒)，悠闲舒适
+                    var duration = 8 + Math.random() * 6;
+                    span.style.animationDuration = duration + 's';
+                    
+                    // 随机大小 (18px - 32px)，远近有致
+                    var size = 18 + Math.random() * 14;
+                    span.style.fontSize = size + 'px';
+                    
+                    // 随机下落延时，更具随机美感
+                    var delay = Math.random() * 2;
+                    span.style.animationDelay = delay + 's';
+                    
+                    document.body.appendChild(span);
+                    
+                    // 下落结束移除元素，防止 DOM 膨胀
+                    setTimeout(function(){
+                        if (span.parentNode) {
+                            span.parentNode.removeChild(span);
+                        }
+                    }, (duration + delay) * 1000);
+                }, 650); // 每 650ms 飘落一个，密度适中且极其治愈
+            })();
+            """)
 
         # 加载静态 JS 工具文件（公告弹窗、截图查看器、自动刷新等）
         # 替代原来的多个 run_js() 运行时注入
@@ -4977,7 +5074,17 @@ def app():
     args, _ = parser.parse_known_args()
 
     # Apply config
-    AlasGUI.set_theme(theme=State.deploy_config.Theme)
+    theme = State.deploy_config.Theme
+    from datetime import datetime
+    current_date = datetime.now().date()
+    if theme == "default" and (
+        (current_date.month == 6 and current_date.day == 1) or
+        (current_date.month == 5 and current_date.day == 31) or
+        (current_date.month == 6 and current_date.day == 2)
+    ):
+        theme = "children"
+
+    AlasGUI.set_theme(theme=theme)
     lang.LANG = State.deploy_config.Language
     key = args.key or State.deploy_config.Password
     cdn = args.cdn if args.cdn else State.deploy_config.CDN
@@ -5039,3 +5146,6 @@ def app():
     app.mount("/mcp", mcp_app)
 
     return app
+
+
+
