@@ -3161,6 +3161,13 @@ class AlasGUI(Frame):
         log.last_display_time = {}
         self._log = log
         self._log.dashboard_arg_group = LogRes(self.alas_config).groups
+        
+        saved_state = get_localstorage("dashboard_display")
+        if saved_state is None:
+            default_state = True
+        else:
+            default_state = saved_state.lower() == "False"
+        self._log.set_dashboard_display(default_state)
 
         with use_scope("logs"):
             if "Maa" in self.ALAS_ARGS:
@@ -3249,10 +3256,7 @@ class AlasGUI(Frame):
 
     def set_dashboard_display(self, b):
         self._log.set_dashboard_display(b)
-        self.alas_update_dashboard(True)
-
-    def set_dashboard_display(self, b):
-        self._log.set_dashboard_display(b)
+        set_localstorage("dashboard_display", str(b).lower())
         self.alas_update_dashboard(True)
 
     def _init_alas_config_watcher(self) -> None:
