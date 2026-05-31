@@ -3166,7 +3166,7 @@ class AlasGUI(Frame):
         if saved_state is None:
             default_state = True
         else:
-            default_state = saved_state.lower() == "False"
+            default_state = saved_state.lower() == "true"
         self._log.set_dashboard_display(default_state)
 
         with use_scope("logs"):
