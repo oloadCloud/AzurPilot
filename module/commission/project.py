@@ -17,8 +17,10 @@ COMMISSION_FILTER = Filter(
         '-?'
         '(\d\d?:\d\d)?'
         '(\d\d?.\d\d?|\d\d?)?'
+        '-?'
+        '(vi|iv|iii|ii|i|v)?'
     ),
-    attr=('category_str', 'genre_str', 'duration_hm', 'duration_hour'),
+    attr=('category_str', 'genre_str', 'duration_hm', 'duration_hour', 'suffix_str'),
     preset=('shortest', 'expire')
 )
 
@@ -119,10 +121,17 @@ class Commission:
         self.genre_str = 'unknown'
         self.duration_hour = 'unknown'
         self.duration_hm = 'unknown'
+        self.suffix_str = 'unknown'
         if self.valid:
             self.category_str, self.genre_str = self.genre.split('_', 1)
             self.duration_hour = str(int(self.duration.total_seconds() / 36) / 100).strip('.0')
             self.duration_hm = str(self.duration).rsplit(':', 1)[0]
+            
+            suffix_map = {
+                'Ⅰ': 'i', 'Ⅱ': 'ii', 'Ⅲ': 'iii', 'Ⅳ': 'iv', 'Ⅴ': 'v', 'Ⅵ': 'vi'
+            }
+            if hasattr(self, 'suffix') and self.suffix:
+                self.suffix_str = suffix_map.get(self.suffix.strip(), 'unknown')
 
     @Config.when(SERVER='en')
     def commission_parse(self):
