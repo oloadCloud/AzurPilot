@@ -382,6 +382,8 @@ class AlasGUI(Frame):
             pywebio_theme = "default"
         if theme == "children":
             pywebio_theme = "default"
+        if theme == "fluent":
+            pywebio_theme = "default"
 
         webconfig(theme=pywebio_theme)
 
@@ -1028,6 +1030,25 @@ class AlasGUI(Frame):
                             "selected_text": "#e05275",
                             "selected_outline": "rgba(255, 182, 193, .5)",
                             "refresh_text": "#e05275",
+                        }
+                    )
+                elif self.theme == "fluent":
+                    md3_colors.update(
+                        {
+                            "toolbar_border": "rgba(255, 255, 255, 0.08)",
+                            "toolbar_bg": "rgba(32, 32, 32, 0.9)",
+                            "toolbar_shadow": "0 8px 16px rgba(0, 0, 0, 0.4)",
+                            "segment_border": "rgba(255, 255, 255, 0.12)",
+                            "segment_divider": "rgba(255, 255, 255, 0.08)",
+                            "segment_outline": "rgba(255, 255, 255, 0.05)",
+                            "segment_bg": "rgba(24, 24, 24, 0.8)",
+                            "text": "#ffffff",
+                            "label": "#cccccc",
+                            "hover": "rgba(255, 255, 255, 0.08)",
+                            "selected_bg": "rgba(96, 205, 255, 0.15)",
+                            "selected_text": "#60cdff",
+                            "selected_outline": "#60cdff",
+                            "refresh_text": "#60cdff",
                         }
                     )
 
@@ -4407,6 +4428,7 @@ class AlasGUI(Frame):
                 [
                     {"label": "Light", "value": "default", "color": "light"},
                     {"label": "Dark", "value": "dark", "color": "dark"},
+                    {"label": "Fluent", "value": "fluent", "color": "primary"},
                     {"label": "新春 ", "value": "socialism", "color": "danger"},
                     {"label": "Apple", "value": "apple", "color": "primary"},
                     {"label": "🧸 童趣", "value": "children", "color": "warning"},
@@ -4567,7 +4589,8 @@ class AlasGUI(Frame):
 
         if self.theme == "dark":
             add_css(filepath_css("dark-alas"))
-
+        elif self.theme == "fluent":
+            add_css(filepath_css("fluent-alas"))
         elif self.theme == "socialism":
             add_css(filepath_css("socialism-alas"))
         elif self.theme == "children":

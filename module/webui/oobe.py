@@ -783,6 +783,8 @@ class OOBEWizard:
             add_css(filepath_css("socialism-alas"))
         elif self.gui.theme == "children":
             add_css(filepath_css("children-alas"))
+        elif self.gui.theme == "fluent":
+            add_css(filepath_css("fluent-alas"))
         else:
             add_css(filepath_css("light-alas"))
 
