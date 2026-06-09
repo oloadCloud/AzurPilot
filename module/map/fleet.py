@@ -81,6 +81,21 @@ class Fleet(Camera, AmbushHandler):
             return 1
 
     @property
+    def is_boss_stage(self):
+        """
+        判断当前战斗场数是否已经达到 BOSS 战
+        """
+        try:
+            if not hasattr(self, 'map') or not hasattr(self.map, 'spawn_data'):
+                return False
+            for data in self.map.spawn_data:
+                if data.get('battle') == self.battle_count:
+                    return data.get('boss', 0) > 0
+        except Exception:
+            pass
+        return False
+
+    @property
     def fleet_step(self):
         if not self.config.MAP_HAS_FLEET_STEP:
             return 0
@@ -546,6 +561,16 @@ class Fleet(Camera, AmbushHandler):
         logger.info(f'Submarine: {location2node(self.fleet_submarine_location)}')
 
     def full_scan(self, queue=None, must_scan=None, mode='normal'):
+        if self.config.Campaign_BossAutoSearch and self.is_boss_stage:
+            logger.info('BossAutoSearch is enabled and Boss stage reached. Mocking Boss spawn to skip map scanning.')
+            boss_grids = self.map.select(may_boss=True)
+            if boss_grids:
+                for grid in boss_grids:
+                    grid.is_boss = True
+                    grid.is_enemy = True
+                logger.info(f'Mocked Boss at grids: {boss_grids}')
+            return
+        
         if self.config.MAP_HAS_DECOY_ENEMY and mode == 'normal':
             mode = 'decoy'
         super().full_scan(
