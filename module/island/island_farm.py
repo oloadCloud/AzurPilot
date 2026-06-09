@@ -284,6 +284,7 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         while 1:
             self.device.screenshot()
             if self.appear_then_click(ISLAND_POST_SELECT, offset=1):
+                self.device.sleep(0.5)
                 continue
             if self.appear(ISLAND_SELECT_CHARACTER_CHECK, offset=1):
                 if product == 'rubber' and self.config.IslandOrchard_AmagiChanRubber:
@@ -303,6 +304,8 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
                     self.device.click(POST_ADD_ORDER)
                     self.device.sleep(0.5)
                     break
+                else:
+                    return self._handle_select_product_failure(product)
         self.post_open(post_button)
         self.device.sleep(0.5)
         self.device.screenshot()
@@ -315,6 +318,9 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
             if post_info['button'] == post_button:
                 post_info['crop'] = product
                 break
+
+        # 关闭详情弹窗，防止后续操作被弹窗遮挡
+        self.post_close()
         return True
 
     def buy_seeds(self, seed, category):

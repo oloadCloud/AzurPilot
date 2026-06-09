@@ -190,6 +190,7 @@ class IslandFishery(Island, WarehouseOCR, LoginHandler):
         while 1:
             self.device.screenshot()
             if self.appear_then_click(ISLAND_POST_SELECT, offset=1):
+                self.device.sleep(0.5)
                 continue
             if self.appear(ISLAND_SELECT_CHARACTER_CHECK, offset=1):
                 if self.select_character():
@@ -205,6 +206,8 @@ class IslandFishery(Island, WarehouseOCR, LoginHandler):
                     self.device.click(POST_ADD_ORDER)
                     self.device.sleep(0.5)
                     break
+                else:
+                    return self._handle_select_product_failure(product)
 
         self.post_open(post_button)
         self.device.sleep(0.5)
@@ -221,6 +224,9 @@ class IslandFishery(Island, WarehouseOCR, LoginHandler):
             if post_info['button'] == post_button:
                 post_info['crop'] = product
                 break
+
+        # 关闭详情弹窗，防止后续操作被弹窗遮挡
+        self.post_close()
         return True
 
     def goto_fishery_gear_shop(self):
@@ -384,7 +390,11 @@ class IslandFishery(Island, WarehouseOCR, LoginHandler):
 
                 for product, count in product_counts.items():
                     buy_max = self.name_to_config[product].get('buy_max', 4)
+                    # 计算需求量：优先使用补种列表中的数量（库存短缺计算所得），
+                    # 若产品不在补种列表中（如由配置强制种植），则按每岗上限填满
                     total_demand = len([p for p in self.to_plant_list if p == product])
+                    if total_demand == 0:
+                        total_demand = count * buy_max
                     logger.info(f"购买{product}鱼苗，需求{total_demand}个，空闲{count}岗，每岗上限{buy_max}个")
                     remaining = total_demand
                     for _ in range(count):

@@ -153,23 +153,27 @@ class IslandRestaurant(IslandShopBase):
         current_season = self.season_config.season
         current_restaurant_items = SEASONAL_ITEMS.get(current_season, {}).get('restaurant', [])
         for spring_item, slot_idx in SEASONAL_MEAL_SWITCH.items():
-            if spring_item not in self.post_products:
+            if not any(name == spring_item for name, _ in self.post_products):
                 continue
+            spring_name = '凉拌双笋' if spring_item == 'double_bamboo_shoots' else '芦笋炒虾仁'
             if slot_idx < len(current_restaurant_items):
                 seasonal_item = current_restaurant_items[slot_idx]
                 if seasonal_item != spring_item:
-                    qty = self.post_products.pop(spring_item)
-                    self.post_products[seasonal_item] = qty
-                    spring_name = '凉拌双笋' if spring_item == 'double_bamboo_shoots' else '芦笋炒虾仁'
+                    self.post_products = [
+                        (seasonal_item, target) if name == spring_item else (name, target)
+                        for name, target in self.post_products
+                    ]
                     logger.info(
                         f"季节餐品自动切换: {spring_item}({spring_name}) -> {seasonal_item}"
                         f"（当前季节: {self.season_config.season_name}）"
                     )
             else:
-                qty = self.post_products.pop(spring_item)
-                spring_name = '凉拌双笋' if spring_item == 'double_bamboo_shoots' else '芦笋炒虾仁'
+                self.post_products = [
+                    (name, target) for name, target in self.post_products
+                    if name != spring_item
+                ]
                 logger.info(
-                    f"季节餐品自动移除: {spring_item}({spring_name}) x{qty}"
+                    f"季节餐品自动移除: {spring_item}({spring_name})"
                     f"（{self.season_config.season_name} 无对应槽位的季节餐品）"
                 )
 
@@ -291,7 +295,8 @@ class IslandRestaurant(IslandShopBase):
 
             # 计算当前总库存
             self.current_totals = {}
-            for item in set(self.post_products.keys()) | set(self.post_check_meal.keys()) | set(
+            all_product_names = set(name for name, _ in self.post_products)
+            for item in all_product_names | set(self.post_check_meal.keys()) | set(
                     self.warehouse_counts.keys()):
                 self.current_totals[item] = self.post_check_meal.get(item, 0) + self.warehouse_counts.get(item, 0)
 
@@ -300,21 +305,13 @@ class IslandRestaurant(IslandShopBase):
             logger.info(f"仓库库存: {self.warehouse_counts}")
             logger.info(f"生产中库存: {self.post_check_meal}")
             logger.info(f"当前总库存: {self.current_totals}")
-            logger.info(f"基础需求配置: {self.post_products}")
+            logger.info(f"基础需求配置（共{len(self.post_products)}个槽位）: {self.post_products}")
             logger.info("===============")
 
-            # 清空待生产列表
-            self.to_post_products = {}
+            # 保存原始库存，retry 时恢复（避免 max_targets 清零影响重算）
+            _orig_totals = dict(self.current_totals)
+            self._compute_base_demands()
 
-            # ============ 基础需求计算 ============
-            logger.info("阶段：基础需求")
-            for item, target in self.post_products.items():
-                current = self.current_totals.get(item, 0)
-                if current < target:
-                    self.to_post_products[item] = target - current
-                    self.current_totals[item] = 0
-                else:
-                    self.current_totals[item] = current - target
             logger.info(f"待完成备餐: {self.to_post_products}")
             logger.info(f"当前剩余库存: {self.current_totals}")
 
@@ -348,9 +345,17 @@ class IslandRestaurant(IslandShopBase):
                 self.to_post_products = temp_products
                 logger.info(f"剩余基础需求生产计划: {self.to_post_products}")
 
-            # ============ 安排基础需求生产 ============
+            # ============ 安排基础需求生产（带停滞重试） ============
             if self.to_post_products:
+                stalled_before = set(self._stalled)
                 self.schedule_production()
+                # 有新产品被标记停滞且仍有空闲岗位 → 恢复库存后重跑需求
+                if set(self._stalled) - stalled_before and self.get_idle_posts():
+                    self.current_totals = _orig_totals
+                    self._compute_base_demands()
+                    if self.to_post_products:
+                        self.to_post_products = self.process_meal_requirements(self.to_post_products)
+                        self.schedule_production()
             else:
                 logger.info("基础需求已满足")
 
