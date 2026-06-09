@@ -439,7 +439,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
             # 战斗结算，退出循环
             if self.handle_battle_status(drop=drop) \
-                    or self.handle_get_items(drop=drop):
+                    or self.handle_get_items(drop=drop) \
+                    or self.is_in_auto_search_menu():
                 break
 
     def handle_battle_status(self, drop=None):

@@ -24,7 +24,8 @@ class Fleet(Camera, AmbushHandler):
     @property
     def fleet_1(self):
         if self.fleet_current_index != 1:
-            self.fleet_ensure(index=1)
+            if not (self.config.Campaign_BossAutoSearch and hasattr(self, 'map') and self.map.select(is_boss=True)):
+                self.fleet_ensure(index=1)
         return self
 
     @fleet_1.setter
@@ -35,7 +36,8 @@ class Fleet(Camera, AmbushHandler):
     def fleet_2(self):
         if self.config.FLEET_2:
             if self.fleet_current_index != 2:
-                self.fleet_ensure(index=2)
+                if not (self.config.Campaign_BossAutoSearch and hasattr(self, 'map') and self.map.select(is_boss=True)):
+                    self.fleet_ensure(index=2)
         return self
 
     @fleet_2.setter

@@ -323,6 +323,7 @@ Campaign:
   UseClearMode: true
   UseFleetLock: true
   UseAutoSearch: true
+  BossAutoSearch: false
   Use2xBook: false
   AmbushEvade: true
   UseRecommendFleet: false
