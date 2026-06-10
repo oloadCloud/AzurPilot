@@ -136,11 +136,24 @@ class GitManager(DeployConfig):
             if self.goc_client.update():
                 return
 
+        proxy = self.GitProxy
+        if proxy and str(proxy).lower() == 'auto':
+            import urllib.request
+            proxies = urllib.request.getproxies()
+            proxy = proxies.get('http') or proxies.get('https')
+            if proxy:
+                if not proxy.startswith('http://') and not proxy.startswith('socks'):
+                    proxy = f'http://{proxy}'
+                logger.info(f'GitProxy is "auto", detected system proxy: {proxy}')
+            else:
+                proxy = ''
+                logger.info('GitProxy is "auto", but no system proxy detected')
+
         self.git_repository_init(
             repo=self.Repository,
             source='origin',
             branch=self.Branch,
-            proxy=self.GitProxy,
+            proxy=proxy,
             ssl_verify=self.SSLVerify,
         )
 
