@@ -1090,6 +1090,10 @@ class Fleet(Camera, AmbushHandler):
         Args:
             preset (tuple): 预设的滑动偏移量 (x, y)。
         """
+        if self.config.Campaign_BossAutoSearch:
+            logger.info('BossAutoSearch is enabled. Skip camera refocusing.')
+            return
+
         camera = self.camera
         if preset is None:
             preset = self.config.MAP_BOSS_APPEAR_REFOCUS_SWIPE
