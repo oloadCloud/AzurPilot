@@ -171,18 +171,31 @@ class RichTimedRotatingHandler(TimedRotatingFileHandler):
         dirName, baseName = os.path.split(self.baseFilename)
         fileNames = os.listdir(dirName)
         result = []
+        cutoff_date = datetime.date.today() - datetime.timedelta(days=self.backupCount)
+        def _is_expired(date_str: str) -> bool:
+            try:
+                file_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                return file_date <= cutoff_date
+            except (ValueError, AttributeError):
+                return False
         suffix = "_" + baseName
         plen = len(suffix)
         for fileName in fileNames:
             if fileName[-plen:] == suffix:
                 prefix = fileName[:-plen]
-                if self.extMatch.match(prefix):
+                if self.extMatch.match(prefix) and _is_expired(prefix):
                     result.append(Path(dirName).joinpath(fileName).resolve())
-        if len(result) < self.backupCount:
-            result = []
-        else:
-            result.sort()
-            result = result[: len(result) - self.backupCount]
+        if self.pname == "alas":
+            for fileName in fileNames:
+                if fileName.endswith("_launcher.txt"):
+                    date_part = fileName.split("_")[0]
+                    if self.extMatch.match(date_part) and _is_expired(date_part):
+                        result.append(Path(dirName).joinpath(fileName).resolve())
+            oss_dir = Path(dirName) / "oss"
+            if oss_dir.exists():
+                for log_file in oss_dir.glob("*.log"):
+                    if self.extMatch.match(log_file.stem) and _is_expired(log_file.stem):
+                        result.append(log_file.resolve())
         return result
 
     def doRollover(self) -> None:
