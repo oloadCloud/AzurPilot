@@ -190,22 +190,20 @@ class Island(SelectCharacter):
                 break
 
     def island_map_goto(self,destination):
-        button_map = {
-            'mine_forest': {
-                'click': ISLAND_MAP_MINE_FOREST,
-                'check': ISLAND_MAP_MINE_FOREST_CHECK
-            },
-            'farm': {
-                'click': ISLAND_MAP_FARM,
-                'check': ISLAND_MAP_FARM_CHECK
-            },
-            'nursery': {
-                'click': ISLAND_MAP_NURSERY,
-                'check': ISLAND_MAP_NURSERY_CHECK
-            }
-        }
-        destination_button = button_map.get(destination, {}).get('click')
-        check_button = button_map.get(destination, {}).get('check')
+        def get_destination_buttons(name):
+            if name == 'mine_forest':
+                return ISLAND_MAP_MINE_FOREST, ISLAND_MAP_MINE_FOREST_CHECK
+            if name == 'farm':
+                return ISLAND_MAP_FARM, ISLAND_MAP_FARM_CHECK
+            if name == 'nursery':
+                return ISLAND_MAP_NURSERY, ISLAND_MAP_NURSERY_CHECK
+            if name == 'assembly':
+                return ISLAND_MAP_ASSEMBLY, ISLAND_MAP_ASSEMBLY_CHECK
+            if name == 'port':
+                return ISLAND_MAP_PORT, ISLAND_MAP_PORT_CHECK
+            raise ValueError(f"未知的岛屿地图目的地: {name}")
+
+        destination_button, check_button = get_destination_buttons(destination)
         self.goto_island_map()
         while True:
             self.device.screenshot()
@@ -282,18 +280,18 @@ class Island(SelectCharacter):
     def post_close(self):
         while 1:
             self.device.screenshot()
-            if self.ui_page_appear(page_island_postmanage) and not self.appear(ISLAND_POST_CHECK, offset=30) and not self.appear(ISLAND_POST_VACANT_CHECK, offset=30):
+            if self.ui_page_appear(page_island_postmanage) and not self.appear(ISLAND_POST_CHECK) and not self.appear(ISLAND_POST_VACANT_CHECK):
                 break
             if self.appear(ISLAND_GET, offset=30):
                 self.device.click(ISLAND_POST_SAFE_AREA)
                 continue
-            if self.appear(ISLAND_POST_CHECK, offset=30) or self.appear(ISLAND_POST_VACANT_CHECK, offset=30):
+            if self.appear(ISLAND_POST_CHECK) or self.appear(ISLAND_POST_VACANT_CHECK):
                 self.device.click(POST_CLOSE)
                 continue
     def post_get_and_close(self):
         while 1:
             self.device.screenshot()
-            if self.ui_page_appear(page_island_postmanage) and not self.appear(ISLAND_POST_CHECK, offset=30) and not self.appear(ISLAND_POST_VACANT_CHECK, offset=30):
+            if self.ui_page_appear(page_island_postmanage) and not self.appear(ISLAND_POST_CHECK) and not self.appear(ISLAND_POST_VACANT_CHECK):
                 break
             if self.appear(ERROR1, offset=30):
                 self.device.click(POST_CLOSE)
@@ -310,7 +308,7 @@ class Island(SelectCharacter):
                 self.device.click(ISLAND_POST_SAFE_AREA)
                 self.device.sleep(0.5)
                 continue
-            if (self.appear(ISLAND_POST_CHECK, offset=30) or self.appear(ISLAND_POST_VACANT_CHECK, offset=30)) and not self.appear(POST_GET, offset=(50, 0)):
+            if (self.appear(ISLAND_POST_CHECK) or self.appear(ISLAND_POST_VACANT_CHECK)) and not self.appear(POST_GET, offset=(50, 0)):
                 self.device.click(POST_CLOSE)
                 continue
     def post_get_and_add(self,product_selection,product_selection_check):
@@ -478,5 +476,4 @@ class Island(SelectCharacter):
                     break
         logger.info(f"尝试{max_attempts}次后仍然失败")
         return False
-
 
