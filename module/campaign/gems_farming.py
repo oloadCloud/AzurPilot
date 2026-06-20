@@ -583,7 +583,7 @@ class GemsFarming(CampaignRun, FleetEquipment, GemsEquipmentHandler, Retirement)
         """
         扫描并查找 common_ship 列表的所有匹配候选舰船，按以下顺序排序：
         1. 情绪值（降序）
-        2. 等级（升序）
+        2. 等级（降序）
         3. 优先级索引（升序）
         """
         templates_list = [TEMPLATE_COMMON_CV[name.upper()] for name in common_ship]
@@ -594,8 +594,8 @@ class GemsFarming(CampaignRun, FleetEquipment, GemsEquipmentHandler, Retirement)
                 if self.match_ship_to_template(ship, template):
                     matched_candidates.append((ship, i))
                     break
-        # 按情绪值（降序）、等级（升序）和优先级索引（升序）排序
-        matched_candidates.sort(key=lambda x: (x[0].emotion, -x[0].level, -x[1]), reverse=True)
+        # 按情绪值（降序）、等级（降序）和优先级索引（升序）排序
+        matched_candidates.sort(key=lambda x: (x[0].emotion, x[0].level, -x[1]), reverse=True)
         return [x[0] for x in matched_candidates]
 
     def find_custom_candidates(self, scanner, ship_type='cv'):
