@@ -14,14 +14,23 @@
   --fluent-card-bg: rgba(32, 32, 32, 0.8);
   --fluent-card-bg-solid: #2d2d2d;
   --fluent-glass-border: rgba(255, 255, 255, 0.08);
+
   --fluent-text: #ffffff;
   --fluent-text-secondary: #cccccc;
   --fluent-text-tertiary: #909090;
   --fluent-text-muted: #808080;
+
   --fluent-accent: #60cdff;
   --fluent-accent-hover: #50bde2;
   --fluent-accent-light: rgba(96, 205, 255, 0.12);
-  --fluent-border: rgba(255, 255, 255, 0.08);
+
+  /* 控件通用色 */
+  --fluent-input-bg: rgba(24, 24, 24, 0.95);
+  --fluent-input-bg-hover: rgba(30, 30, 30, 0.95);
+  --fluent-input-border: rgba(255, 255, 255, 0.12);
+  --fluent-input-border-bottom: rgba(255, 255, 255, 0.45);
+  --fluent-input-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  --fluent-data-bg: rgba(24, 24, 24, 0.6);
 
   /* 投影 */
   --fluent-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -31,16 +40,13 @@
 
   /* 字体 */
   --fluent-font-stack: "Segoe UI Variable Text", "Segoe UI", "Segoe UI Emoji", "Microsoft YaHei", "MiSans", sans-serif;
-  --fluent-font-mono: "Fira Code", "Cascadia Code", "OPPO Sans 4.0", "Segoe UI Emoji", monospace;
+  --fluent-font-mono: "Fira Code", "Cascadia Code", "等距更纱黑体 SC", "Segoe UI Emoji", monospace;
 
   /* 间距与圆角 */
-  --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 12px;
   --spacing-lg: 24px;
-  --radius-sm: 6px;
-  --radius-md: 6px;
-  --radius-lg: 6px;
+  --radius-default: 6px;
   --radius-pill: 11px;
 
   /* 滚动条 */
@@ -55,7 +61,7 @@
 }
 
 /* ==========================================
-   2. 全局基础
+   2. 全局与滚动条
    ========================================== */
 html, body {
   background-color: var(--fluent-bg) !important;
@@ -83,12 +89,69 @@ p, span, div, label, li, td, th { color: inherit; }
   background: var(--scrollbar-thumb);
   background-clip: padding-box;
   border: 2px solid transparent;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-default) !important;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ==========================================
-   3. 布局骨架
+   3. 亚克力/玻璃容器
+   ========================================== */
+:is(
+  [id^="pywebio-scope-group_"]:not(#pywebio-scope-menu):not(#pywebio-scope-aside):not(#pywebio-scope-navigator),
+  #pywebio-scope-running,
+  #pywebio-scope-pending,
+  #pywebio-scope-waiting,
+  #pywebio-scope-scheduler-bar,
+  #pywebio-scope-stat-bar,
+  #pywebio-scope-image-container,
+  #pywebio-scope-ap_chart,
+  #pywebio-scope-resource_chart,
+  #pywebio-scope-opsi_stats,
+  #pywebio-scope-ship_exp_table,
+  #pywebio-scope-commission_income,
+  #pywebio-scope-log-bar,
+  #pywebio-scope-log,
+  .container-log,
+  #pywebio-scope-groups > *:not(#pywebio-scope-navigator),
+  .launcher-setting-panel,
+  .deploy-setting-panel
+) {
+  background-color: var(--fluent-card-bg) !important;
+  backdrop-filter: blur(30px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
+  border: 1px solid var(--fluent-glass-border) !important;
+  border-radius: var(--radius-default) !important;
+  box-shadow: var(--fluent-shadow) !important;
+  animation: ios-slide-up var(--transition-normal) both;
+}
+
+/* 下拉框防溢出 */
+:is(
+  [id^="pywebio-scope-group_"],
+  .form-group,
+  [id^="pywebio-scope-arg_container"]
+) { overflow: visible !important; }
+
+div:has(.bootstrap-select.show),
+[id^="pywebio-scope-group_"]:has(.bootstrap-select.show),
+.form-group:has(.bootstrap-select.show) {
+  z-index: 1050 !important;
+  position: relative !important;
+}
+
+/* 容器特例：日志区更深阴影与边框 */
+.container-log {
+  background-color: rgba(24, 24, 24, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: var(--fluent-shadow-lg) !important;
+}
+#pywebio-scope-log :is(div, pre, code, *) {
+  font-family: var(--fluent-font-mono) !important;
+  color: #e6e6e6;
+}
+
+/* ==========================================
+   4. 布局骨架
    ========================================== */
 /* 侧边栏 */
 #pywebio-scope-aside {
@@ -98,18 +161,11 @@ p, span, div, label, li, td, th { color: inherit; }
   border-right: 1px solid var(--fluent-glass-border) !important;
   padding-top: 20px !important;
 }
-#pywebio-scope-aside *,
-#pywebio-scope-aside .btn,
-#pywebio-scope-aside a,
-.btn-aside,
-.btn-aside * {
+:is(#pywebio-scope-aside, #pywebio-scope-aside .btn, #pywebio-scope-aside a, .btn-aside, .btn-aside *) {
   color: rgba(255, 255, 255, 0.85) !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
-#pywebio-scope-aside .btn:hover,
-#pywebio-scope-aside a:hover,
-.btn-aside:hover,
-.btn-aside:hover * {
+:is(#pywebio-scope-aside .btn:hover, #pywebio-scope-aside a:hover, .btn-aside:hover, .btn-aside:hover *) {
   color: var(--fluent-accent) !important;
 }
 .btn-aside-active, .btn-aside-active * { color: var(--fluent-accent) !important; }
@@ -141,7 +197,7 @@ p, span, div, label, li, td, th { color: inherit; }
   background-color: var(--fluent-card-bg) !important;
   backdrop-filter: blur(30px) saturate(125%) !important;
   border: 1px solid var(--fluent-glass-border) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-default) !important;
   box-shadow: var(--fluent-shadow-xs) !important;
   color: var(--fluent-text-secondary) !important;
   font-weight: 500 !important;
@@ -159,169 +215,67 @@ p, span, div, label, li, td, th { color: inherit; }
 }
 
 /* ==========================================
-   4. 卡片与容器
+   5. 表单控件：基底输入与聚焦
    ========================================== */
-/* 亚克力卡片组 */
-[id^="pywebio-scope-group_"]:not(#pywebio-scope-menu):not(#pywebio-scope-aside):not(#pywebio-scope-navigator),
-#pywebio-scope-running,
-#pywebio-scope-pending,
-#pywebio-scope-waiting,
-#pywebio-scope-scheduler-bar,
-#pywebio-scope-stat-bar,
-#pywebio-scope-image-container,
-#pywebio-scope-ap_chart,
-#pywebio-scope-resource_chart,
-#pywebio-scope-opsi_stats,
-#pywebio-scope-ship_exp_table,
-#pywebio-scope-commission_income,
-#pywebio-scope-log-bar,
-#pywebio-scope-log,
-.container-log,
-#pywebio-scope-groups > *:not(#pywebio-scope-navigator) {
-  background-color: var(--fluent-card-bg) !important;
-  backdrop-filter: blur(30px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
-  border: 1px solid var(--fluent-glass-border) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--fluent-shadow) !important;
-  animation: ios-slide-up var(--transition-normal) both;
+:is(
+  .form-control:not(button):not([type="range"]),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .deploy-setting-input,
+  .deploy-setting-select,
+  .bootstrap-select > .btn.dropdown-toggle,
+  .CodeMirror, .CodeMirror-gutters, .CodeMirror-wrap
+) {
+  background-color: var(--fluent-input-bg) !important;
+  border: 1px solid var(--fluent-input-border) !important;
+  border-bottom: 2px solid var(--fluent-input-border-bottom) !important;
+  border-radius: var(--radius-default) !important;
+  box-shadow: var(--fluent-input-shadow) !important;
+  color: #ffffff !important;
+  transition: all var(--transition-fast) !important;
 }
 
-/* 下拉框防溢出 */
-[id^="pywebio-scope-group_"],
-.form-group,
-[id^="pywebio-scope-arg_container"] {
-  overflow: visible !important;
-}
-div:has(.bootstrap-select.show),
-[id^="pywebio-scope-group_"]:has(.bootstrap-select.show),
-.form-group:has(.bootstrap-select.show) {
-  z-index: 1050 !important;
-  position: relative !important;
-}
-
-/* 日志区 */
-.container-log {
-  background-color: rgba(24, 24, 24, 0.9) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  box-shadow: var(--fluent-shadow-lg) !important;
-}
-#pywebio-scope-log div,
-#pywebio-scope-log pre,
-#pywebio-scope-log code,
-#pywebio-scope-log * {
-  font-family: var(--fluent-font-mono) !important;
-  color: #e6e6e6;
-}
-
-/* ==========================================
-   5. 交互控件：按钮
-   ========================================== */
-.btn {
-  border-radius: var(--radius-md) !important;
+/* 局部差异微调 */
+.bootstrap-select > .btn.dropdown-toggle { border-bottom-color: rgba(255, 255, 255, 0.25) !important; }
+.deploy-setting-input, .deploy-setting-select {
+  width: 100% !important;
+  min-height: 32px !important;
+  padding: 4px 10px !important;
   font-size: 13px !important;
-  font-weight: 500 !important;
-  transition: all var(--transition-fast) !important;
 }
 
-/* 次要按钮 */
-.btn-secondary,
-.btn-light,
-.btn:not(.btn-primary):not(.btn-on):not(.btn-aside):not(.btn-menu):not(.btn-success):not(.btn-danger):not(.btn-warning):not(.btn-info) {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: var(--fluent-shadow-xs) !important;
-  color: #f5f5f5 !important;
-}
-.btn-secondary:hover,
-.btn-light:hover,
-.btn:not(.btn-primary):not(.btn-on):not(.btn-aside):not(.btn-menu):not(.btn-success):not(.btn-danger):not(.btn-warning):not(.btn-info):hover {
-  background-color: rgba(255, 255, 255, 0.09) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
-}
-
-/* 主要动作按钮 */
-.btn-on, .btn-primary {
-  background-color: var(--fluent-accent) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  color: #000000 !important;
-  font-weight: 600 !important;
-}
-.btn-on:hover, .btn-primary:hover {
-  background-color: var(--fluent-accent-hover) !important;
-  box-shadow: 0 0 14px rgba(96, 205, 255, 0.35) !important;
-  color: #000000 !important;
-}
-
-/* 语义按钮 */
-.btn-success { background-color: #107c41 !important; border: 1px solid var(--fluent-glass-border) !important; color: #fff !important; }
-.btn-success:hover { background-color: #138c4b !important; }
-.btn-danger { background-color: #a80000 !important; border: 1px solid var(--fluent-glass-border) !important; color: #fff !important; }
-.btn-danger:hover { background-color: #b80000 !important; }
-.btn-warning { background-color: #d83b01 !important; border: 1px solid var(--fluent-glass-border) !important; color: #fff !important; }
-.btn-warning:hover { background-color: #e84a0c !important; }
-.btn-info { background-color: #0078d4 !important; border: 1px solid var(--fluent-glass-border) !important; color: #fff !important; }
-.btn-info:hover { background-color: #1085e0 !important; }
-
-/* 菜单选项按钮 */
-.btn-menu {
-  background: transparent !important;
-  border: none !important;
-  border-radius: var(--radius-md) !important;
-  color: var(--fluent-text-secondary) !important;
-  margin: 2px 4px !important;
-  padding: 8px 12px 8px 14px !important;
-}
-.btn-menu:hover { background-color: rgba(255, 255, 255, 0.04) !important; color: #fff !important; }
-.btn-menu-active, #pywebio-scope-menu .btn-menu-active {
-  background-color: var(--fluent-accent-light) !important;
-  color: var(--fluent-accent) !important;
-  font-weight: 600 !important;
-  position: relative !important;
-}
-.btn-menu-active::before, #pywebio-scope-menu .btn-menu-active::before {
-  background-color: var(--fluent-accent) !important;
-  border-radius: 2px !important;
-  content: "" !important;
-  height: 50% !important;
-  left: 0 !important;
-  position: absolute !important;
-  top: 25% !important;
-  width: 3px !important;
-}
-
-/* ==========================================
-   6. 交互控件：输入框/下拉框/开关/滑动条
-   ========================================== */
-/* 文本输入框 */
-.form-control:not(button):not([type="range"]),
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[id^="pywebio-scope-"] .form-control:not([type="range"]) {
-  background-color: rgba(24, 24, 24, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.45) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6) !important;
-  color: #ffffff !important;
-  transition: all var(--transition-fast) !important;
-}
-.form-control:not(button):not([type="range"]):hover,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):hover {
-  background-color: rgba(30, 30, 30, 0.95) !important;
+/* Hover 状态 */
+:is(
+  .form-control:not(button):not([type="range"]),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .bootstrap-select > .btn.dropdown-toggle
+):hover {
+  background-color: var(--fluent-input-bg-hover) !important;
   border-color: rgba(255, 255, 255, 0.22) !important;
 }
-/* 输入框焦点状态（底部主题指示线 + 微光） */
-.form-control:not(button):not([type="range"]):focus,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
-[id^="pywebio-scope-"] .form-control:not([type="range"]):focus {
+
+/* Focus 发光状态 */
+:is(
+  .form-control:not(button):not([type="range"]),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .deploy-setting-input,
+  .deploy-setting-select
+):focus,
+.CodeMirror:focus-within {
+  outline: none !important;
   border-bottom-color: var(--fluent-accent) !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(96, 205, 255, 0.4) !important;
-  transition: border-bottom-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+  box-shadow: var(--fluent-input-shadow), 0 1px 2px rgba(96, 205, 255, 0.4) !important;
 }
 
+.bootstrap-select > .btn.dropdown-toggle:focus {
+  border-bottom-color: var(--fluent-accent) !important;
+  box-shadow: 0 0 0 1px var(--fluent-accent-light), 0 2px 8px rgba(96, 205, 255, 0.25) !important;
+}
+
+/* ==========================================
+   6. 表单控件：下拉框
+   ========================================== */
 /* 隐藏原生 Select */
-select, select.form-control, .bootstrap-select > select {
+:is(select:not(.deploy-setting-select), select.form-control:not(.deploy-setting-select), .bootstrap-select > select) {
   display: none !important;
   height: 0 !important;
   opacity: 0 !important;
@@ -331,7 +285,6 @@ select, select.form-control, .bootstrap-select > select {
   width: 0 !important;
 }
 
-/* Bootstrap-Select 重构 */
 div.form-control { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
 .bootstrap-select {
   background: transparent !important;
@@ -343,12 +296,6 @@ div.form-control { background: transparent !important; border: none !important; 
 }
 .bootstrap-select > .btn.dropdown-toggle {
   align-items: center !important;
-  background-color: rgba(24, 24, 24, 0.9) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-  color: #ffffff !important;
   display: flex !important;
   justify-content: space-between !important;
   height: auto !important;
@@ -366,38 +313,37 @@ div.form-control { background: transparent !important; border: none !important; 
   opacity: 0.8 !important;
   width: 12px !important;
 }
-.bootstrap-select > .btn.dropdown-toggle:hover { background-color: rgba(30, 30, 30, 0.95) !important; border-color: rgba(255, 255, 255, 0.22) !important; }
-/* 下拉框焦点状态（底部主题指示线 + 增强发光） */
-.bootstrap-select > .btn.dropdown-toggle:focus {
-  border-bottom-color: var(--fluent-accent) !important;
-  box-shadow: 0 0 0 1px var(--fluent-accent-light), 0 2px 8px rgba(96, 205, 255, 0.25) !important;
-}
 .bootstrap-select .filter-option { color: #ffffff !important; font-size: 14px !important; text-align: left !important; }
 
 /* 下拉弹窗 */
-.dropdown-menu, .bootstrap-select .dropdown-menu {
+:is(.dropdown-menu, .bootstrap-select .dropdown-menu) {
   background-color: #242424 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--fluent-input-border) !important;
+  border-radius: var(--radius-default) !important;
   box-shadow: var(--fluent-shadow-lg) !important;
   padding: 4px !important;
   z-index: 2000 !important;
 }
-.dropdown-menu li a, .bootstrap-select .dropdown-menu li a {
+:is(.dropdown-menu li a, .bootstrap-select .dropdown-menu li a) {
   background: transparent !important;
   border-radius: 4px !important;
   color: #e3e3e3 !important;
   padding: 6px 12px !important;
 }
-.dropdown-menu li a:hover, .bootstrap-select .dropdown-menu li a:hover { background-color: rgba(255, 255, 255, 0.08) !important; color: var(--fluent-accent) !important; }
-.dropdown-menu li.active a, .dropdown-menu li.selected a,
-.bootstrap-select .dropdown-menu li.active a, .bootstrap-select .dropdown-menu li.selected a {
+:is(.dropdown-menu li a:hover, .bootstrap-select .dropdown-menu li a:hover) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--fluent-accent) !important;
+}
+:is(.dropdown-menu li.active a, .dropdown-menu li.selected a, .bootstrap-select .dropdown-menu li.active a, .bootstrap-select .dropdown-menu li.selected a) {
   background-color: var(--fluent-accent-light) !important;
   color: var(--fluent-accent) !important;
   font-weight: 600 !important;
 }
 
-/* 开关 Toggle */
+/* ==========================================
+   7. 表单控件：开关与滑动条
+   ========================================== */
+/* 原生开关 Toggle */
 input[type="checkbox"] {
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -410,9 +356,9 @@ input[type="checkbox"] {
   height: 22px !important;
   outline: none !important;
   position: relative !important;
-  transition: background-color var(--transition-fast) ease, border-color var(--transition-fast) ease !important;
   vertical-align: middle !important;
   width: 44px !important;
+  transition: background-color var(--transition-fast) ease, border-color var(--transition-fast) ease !important;
 }
 input[type="checkbox"]::before {
   background-color: #cccccc !important;
@@ -423,13 +369,34 @@ input[type="checkbox"]::before {
   left: 3px !important;
   position: absolute !important;
   top: 3px !important;
-  transition: background-color var(--transition-fast) ease, transform var(--transition-fast) cubic-bezier(0.1, 0.9, 0.2, 1) !important;
   width: 14px !important;
+  transition: background-color var(--transition-fast) ease, transform var(--transition-fast) cubic-bezier(0.1, 0.9, 0.2, 1) !important;
 }
 input[type="checkbox"]:hover { background-color: rgba(255, 255, 255, 0.15) !important; border-color: rgba(255, 255, 255, 0.3) !important; }
 input[type="checkbox"]:hover::before { background-color: #ffffff !important; }
 input[type="checkbox"]:checked { background-color: var(--fluent-accent) !important; border-color: var(--fluent-accent) !important; }
 input[type="checkbox"]:checked::before { background-color: #000000 !important; transform: translateX(22px) !important; }
+
+/* Launcher 开关 */
+.launcher-switch { width: 44px !important; height: 22px !important; }
+.launcher-slider {
+  border: none !important;
+  overflow: hidden !important;
+  border-radius: var(--radius-pill) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+  transition: background-color var(--transition-fast) ease;
+}
+.launcher-slider:before {
+  width: 14px !important; height: 14px !important; left: 3px !important; bottom: 3px !important;
+  background: #cccccc !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+  transition: background-color var(--transition-fast) ease, transform var(--transition-fast) cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+.launcher-switch input:checked + .launcher-slider { background: var(--fluent-accent) !important; box-shadow: none !important; }
+.launcher-switch input:checked + .launcher-slider:before { background: #000000 !important; transform: translateX(22px) !important; }
+.launcher-switch:hover .launcher-slider { background: rgba(255, 255, 255, 0.15) !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3) !important; }
+.launcher-switch:hover .launcher-slider:before { background: #ffffff !important; }
 
 /* 滑动条 Range */
 input[type="range"] {
@@ -461,93 +428,166 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer !important;
   height: 16px !important;
   margin-top: -6px !important;
-  transition: background-color var(--transition-fast) ease, transform var(--transition-fast) ease !important;
   width: 16px !important;
+  transition: background-color var(--transition-fast) ease, transform var(--transition-fast) ease !important;
 }
 input[type="range"]::-webkit-slider-thumb:hover { background-color: var(--fluent-accent-hover) !important; transform: scale(1.15) !important; }
 
 /* ==========================================
-   7. 交互控件：CodeMirror
+   8. 交互控件：按钮
    ========================================== */
-.CodeMirror, .CodeMirror-gutters, .CodeMirror-wrap {
-  background-color: rgba(24, 24, 24, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.45) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6) !important;
+.btn {
+  border-radius: var(--radius-default) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all var(--transition-fast) !important;
 }
+
+/* 次要按钮：排除特例类 */
+.btn:not(:is(.btn-primary, .btn-on, .btn-aside, .btn-menu, .btn-success, .btn-danger, .btn-warning, .btn-info, .btn-light, .btn-dark, .btn-secondary)),
+.deploy-setting-button:not(.primary) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--fluent-shadow-xs) !important;
+  color: #f5f5f5 !important;
+}
+.btn:not(:is(.btn-primary, .btn-on, .btn-aside, .btn-menu, .btn-success, .btn-danger, .btn-warning, .btn-info, .btn-light, .btn-dark, .btn-secondary)):hover,
+.deploy-setting-button:not(.primary):hover {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+.deploy-setting-button:not(.primary) {
+  min-height: 28px !important;
+  padding: 3px 12px !important;
+  cursor: pointer !important;
+  line-height: 1.4 !important;
+}
+.deploy-setting-button:disabled { opacity: 0.5 !important; cursor: not-allowed !important; }
+
+/* 主要动作按钮 */
+:is(.btn-on, .btn-primary, .deploy-setting-button.primary) {
+  background-color: var(--fluent-accent) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+:is(.btn-on:hover, .btn-primary:hover, .deploy-setting-button.primary:hover) {
+  background-color: var(--fluent-accent-hover) !important;
+  box-shadow: 0 0 14px rgba(96, 205, 255, 0.35) !important;
+  color: #000000 !important;
+}
+.deploy-setting-button.primary { font-weight: 600 !important; }
+
+/* 菜单选项按钮 */
+.btn-menu {
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--radius-default) !important;
+  color: var(--fluent-text-secondary) !important;
+  margin: 2px 4px !important;
+  padding: 8px 12px 8px 14px !important;
+}
+.btn-menu:hover { background-color: rgba(255, 255, 255, 0.04) !important; color: #fff !important; }
+:is(.btn-menu-active, #pywebio-scope-menu .btn-menu-active) {
+  background-color: var(--fluent-accent-light) !important;
+  color: var(--fluent-accent) !important;
+  font-weight: 600 !important;
+  position: relative !important;
+}
+:is(.btn-menu-active, #pywebio-scope-menu .btn-menu-active)::before {
+  background-color: var(--fluent-accent) !important;
+  border-radius: 2px !important;
+  content: "" !important;
+  height: 50% !important;
+  left: 0 !important;
+  position: absolute !important;
+  top: 25% !important;
+  width: 3px !important;
+}
+
+/* ==========================================
+   9. 功能组件：CodeMirror / Modal / Table
+   ========================================== */
+/* CodeMirror */
 .CodeMirror-scroll { background-color: transparent !important; }
-.CodeMirror-activeline-background,
-.CodeMirror-focus .CodeMirror-activeline-background,
-.CodeMirror-linebackground { background-color: rgba(255, 255, 255, 0.05) !important; }
-.CodeMirror-line, .CodeMirror-line span, .CodeMirror-lines, .CodeMirror-code, .CodeMirror-measure, .CodeMirror-measure > pre {
+:is(.CodeMirror-activeline-background, .CodeMirror-focus .CodeMirror-activeline-background, .CodeMirror-linebackground) { background-color: rgba(255, 255, 255, 0.05) !important; }
+:is(.CodeMirror-line, .CodeMirror-line span, .CodeMirror-lines, .CodeMirror-code, .CodeMirror-measure, .CodeMirror-measure > pre) {
   background: transparent !important;
   color: #ffffff !important;
   font-family: var(--fluent-font-mono) !important;
 }
 .CodeMirror-cursor { border-left: 2px solid var(--fluent-accent) !important; }
-.CodeMirror-selected, .CodeMirror-selectedtext { background-color: rgba(96, 205, 255, 0.25) !important; }
+:is(.CodeMirror-selected, .CodeMirror-selectedtext) { background-color: rgba(96, 205, 255, 0.25) !important; }
 .CodeMirror-gutters { background-color: rgba(16, 16, 16, 0.5) !important; border-right: 1px solid var(--fluent-glass-border) !important; }
 .CodeMirror-linenumber { color: #888888 !important; }
-/* CodeMirror 焦点状态（底部主题指示线） */
-.CodeMirror:focus-within {
-  border-bottom-color: var(--fluent-accent) !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(96, 205, 255, 0.3) !important;
-}
 
-/* ==========================================
-   8. 弹窗模态
-   ========================================== */
-.modal-content, .popup, .popup-body {
+/* 弹窗模态 */
+:is(.modal-content, .popup, .popup-body) {
   background-color: #202020 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--fluent-input-border) !important;
+  border-radius: var(--radius-default) !important;
   box-shadow: var(--fluent-shadow-lg) !important;
   color: #ffffff !important;
 }
-.modal-header, .modal-footer { background-color: rgba(255, 255, 255, 0.02) !important; border-color: var(--fluent-glass-border) !important; }
+:is(.modal-header, .modal-footer) { background-color: rgba(255, 255, 255, 0.02) !important; border-color: var(--fluent-glass-border) !important; }
 .modal-body { color: #e3e3e3 !important; }
-.modal-title, .modal-header .close { color: #ffffff !important; opacity: 0.8; text-shadow: none !important; }
+:is(.modal-title, .modal-header .close) { color: #ffffff !important; opacity: 0.8; text-shadow: none !important; }
 .modal-header .close:hover { color: var(--fluent-accent) !important; opacity: 1; }
 
-/* ==========================================
-   9. 数据展示：表格与细节
-   ========================================== */
-/* 全局表格暗色 */
-table, table table, table tbody, table thead, table tr, table td, table th,
-.pywebio-table, .pywebio-table *,
-[id^="pywebio-scope-"] table, [id^="pywebio-scope-"] table *, [id^="pywebio-scope-"] td, [id^="pywebio-scope-"] th {
+/* 数据展示：表格 */
+:where(table, table table, table tbody, table thead, table tr, table td, table th, .pywebio-table, .pywebio-table *, [id^="pywebio-scope-"] table, [id^="pywebio-scope-"] table *, [id^="pywebio-scope-"] td, [id^="pywebio-scope-"] th) {
   background: transparent !important;
 }
 td, th {
-  background-color: rgba(24, 24, 24, 0.6) !important;
+  background-color: var(--fluent-data-bg) !important;
   border-color: var(--fluent-glass-border) !important;
   color: #ffffff !important;
 }
 
-/* 特定区域圆角补全 */
-#pywebio-scope-opsi_stats th:first-child,
-#pywebio-scope-ship_exp_table th:first-child,
-#pywebio-scope-commission_income th:first-child { border-top-left-radius: var(--radius-md) !important; }
-#pywebio-scope-opsi_stats th:last-child,
-#pywebio-scope-ship_exp_table th:last-child,
-#pywebio-scope-commission_income th:last-child { border-top-right-radius: var(--radius-md) !important; }
-#pywebio-scope-commission_income .commission-income-summary,
-#pywebio-scope-commission_income .commission-income-table-wrap,
-#pywebio-scope-commission_income .commission-income-recent,
-#pywebio-scope-commission_income .commission-income-metric-card,
-#pywebio-scope-commission_income .commission-income-table,
-#pywebio-scope-commission_income .commission-income-recent-row {
+/* 圆角补全 */
+:is(#pywebio-scope-opsi_stats, #pywebio-scope-ship_exp_table, #pywebio-scope-commission_income) th:first-child { border-top-left-radius: var(--radius-default) !important; }
+:is(#pywebio-scope-opsi_stats, #pywebio-scope-ship_exp_table, #pywebio-scope-commission_income) th:last-child { border-top-right-radius: var(--radius-default) !important; }
+:is(
+  #pywebio-scope-commission_income .commission-income-summary,
+  #pywebio-scope-commission_income .commission-income-table-wrap,
+  #pywebio-scope-commission_income .commission-income-recent,
+  #pywebio-scope-commission_income .commission-income-metric-card,
+  #pywebio-scope-commission_income .commission-income-table,
+  #pywebio-scope-commission_income .commission-income-recent-row
+) {
   border-color: var(--fluent-glass-border) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-default) !important;
 }
 
+/* ==========================================
+   10. 细节与杂项设定
+   ========================================== */
 /* 更新器区域 */
-#pywebio-scope-updater_btn,
-#pywebio-scope-updater_info,
-#pywebio-scope-updater_detail,
-#pywebio-scope-updater_loading,
-#pywebio-scope-updater_state {
+:is(#pywebio-scope-updater_btn, #pywebio-scope-updater_info, #pywebio-scope-updater_detail, #pywebio-scope-updater_loading, #pywebio-scope-updater_state) {
   background-color: rgba(0, 0, 0, 0.2) !important;
   backdrop-filter: blur(10px) !important;
+}
+
+/* 启动面板：透明化避免嵌套双重卡片 */
+.startup-run-panel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 8px 12px 8px 14px !important;
+  margin: 0 !important;
+}
+
+/* 文字颜色：统一面板内各级文字色值 */
+:is(.launcher-setting-title, .deploy-setting-title, .deploy-setting-group-title, .deploy-setting-field label, .startup-run-title) {
+  color: var(--fluent-text) !important;
+  font-weight: 700 !important;
+}
+:is(.launcher-setting-desc, .deploy-setting-notice, .deploy-setting-help, .startup-run-desc) {
+  color: var(--fluent-text-secondary) !important;
+}
+:is(.launcher-setting-status, .startup-run-status) {
+  color: var(--fluent-text-muted) !important;
+  font-size: .92rem !important;
+  line-height: 1.55 !important;
 }

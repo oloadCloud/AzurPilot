@@ -6,7 +6,7 @@ from module.config.utils import LANGUAGES, alas_instance
 from module.webui.setting import State
 
 
-THEME_OPTIONS = ["default", "dark", "light", "socialism", "apple", "children"]
+THEME_OPTIONS = ["default", "dark", "light", "fluent", "socialism", "apple", "children"]
 INVALID_INSTANCE_CHARS = set(".\\/:*?\"'<>|")
 
 
