@@ -81,6 +81,13 @@ Scheduler:
     type: checkbox
     value: false
     option: [true, false]
+Restart:
+  RandomDelay:
+    value: 5, 50
+  ClearCache:
+    type: checkbox
+    value: false
+    option: [true, false]
 Emulator:
   Serial:
     value: auto
@@ -181,12 +188,12 @@ Error:
   LlmAnalysis: true
   LlmApiKey:
     type: textarea
-    value: "sk-O6ZQRe5T4NJVV8gdVTFHTZAI3Q8ZKtJMWdrrKeGljw3zUX4b"
+    value: ""
   LlmApiBase:
     type: textarea
-    value: "https://api.nanoda.work/v1"
+    value: "https://api.xiaomimimo.com/v1"
   LlmModel:
-    value: "Nvidia/qwen/qwen2.5-coder-32b-instruct"
+    value: "mimo-v2.5-pro"
     valuetype: str
 Optimization:
   OcrDevice:
@@ -268,6 +275,7 @@ YukikazeTaskManager:
     value: |-
       Restart
       > OpsiCrossMonth
+      > OpsiScheduling
       > Commission > Tactical > Research
       > Exercise
       > Dorm > Meowfficer > Guild > Gacha
@@ -327,7 +335,9 @@ Campaign:
   Use2xBook: false
   AmbushEvade: true
   UseRecommendFleet: false
-  DefeatWithdraw: true
+  DefeatWithdraw:
+    value: withdraw_stop
+    option: [ withdraw_continue, switch_fleet, withdraw_stop ]
 StopCondition:
   OilLimit: 1000
   CoinLimit: 0
@@ -338,6 +348,20 @@ StopCondition:
   StageIncrease: false
   GetNewShip: false
   ReachLevel: 0
+WarArchives:
+  DailyRunCount: 0
+  DailyRunCountRemain:
+    type: stored
+    value: 0
+    display: hide
+  DailyRunCountRecord:
+    type: stored
+    value: 2020-01-01 00:00:00
+    display: hide
+  DailyRunCountLimit:
+    type: stored
+    value: 0
+    display: hide
 Fleet:
   Fleet1:
     value: 1
@@ -842,7 +866,7 @@ PrivateQuarters:
     TargetInteract: true
     TargetShip:
       value: anchorage
-      option: [ anchorage, noshiro, sirius, new_jersey, taihou, aegir ]
+      option: [ anchorage, noshiro, sirius, new_jersey, taihou, aegir, nakhimov ]
 # ==================== Daily ====================
 
 Daily:
@@ -1008,6 +1032,10 @@ OpsiMonthBoss:
   ForceRun: false
 OpsiMeowfficerFarming:
   ActionPointPreserve: 1000
+  SmartNaturalAPCleanup:
+    type: stored
+    value: false
+    display: hide
   HazardLevel:
     value: 5
     option: [ 2, 3, 4, 5, 6, 10 ]
@@ -1078,6 +1106,12 @@ OpsiScheduling:
     value: 40000
   ActionPointPreserve:
     value: 200
+  ActionPointEarlyTriggerEnable:
+    value: true
+    type: checkbox
+    option: [true, false]
+  ActionPointEarlyTriggerThreshold:
+    value: 200
 
   OperationCoinsReturnThreshold:
     value: 20000
@@ -1121,6 +1155,8 @@ IslandFarm:
   Positions:
     value: 3
     option: [ 1, 2, 3, 4 ]
+  WorkerFilter: |-
+    WorkerJuu
   MinFarm: 660
   PlantPotatoes:
     value: 4
@@ -1129,6 +1165,8 @@ IslandOrchard:
   Positions:
     value: 4
     option: [ 1, 2, 3, 4 ]
+  WorkerFilter: |-
+    WorkerJuu
   MinOrchard: 300
   IgnoreAvocado: true
   PlantRubber:
@@ -1139,6 +1177,8 @@ IslandNursery:
   Positions:
     value: 2
     option: [ 1, 2 ]
+  WorkerFilter: |-
+    WorkerJuu
   MinNursery: 0
   IgnorePineapple: true
   PlantLavender:
@@ -1151,6 +1191,8 @@ IslandRancher:
   RancherFilter: |-
     WorkerJuu
   Wool: true
+  WoolWorkerFilter: |-
+    WorkerJuu
 IslandFishery:
   Positions:
     value: 3
@@ -1159,6 +1201,7 @@ IslandFishery:
   MinYellowfinTuna: 50
   MinShell: 50
   MinShrimp: 50
+  MinCrayfish: 50
   MinCrab: 50
   MinSquid: 50
   MinSeaCucumber: 50
@@ -1174,6 +1217,8 @@ IslandMine:
   MineSilver:
     value: 1
     option: [ 0, 1, 2, 3, 4 ]
+  WorkerFilter: |-
+    WorkerJuu
   MinCopper:
     value: 50
   MinAluminium:
@@ -1191,12 +1236,18 @@ IslandForest:
   CutElegant:
     value: 1
     option: [ 0, 1, 2, 3, 4 ]
+  WorkerFilter: |-
+    WorkerJuu
   MinElegant:
     value: 50
   MinPractical:
     value: 50
   MinSelected:
     value: 50
+IslandDailyGather:
+  WorkerFilter:
+    value: ""
+    preserve_empty: true
 IslandRestaurant:
   PostNumber:
     value: 2
@@ -1307,48 +1358,48 @@ IslandGrill:
     WorkerJuu
   Meal1:
     value: double_energy
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy  ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber1:
     value: 7
   Meal2:
     value: steak_bowl
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber2:
     value: 7
   Meal3:
     value: stir_fried_chicken
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber3:
     value: 7
   Meal4:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber4:
     value: 0
   Meal5:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber5:
     value: 0
   Meal6:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber6:
     value: 0
   Meal7:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber7:
     value: 0
   Meal8:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
   MealNumber8:
     value: 0
 IslandGrillNextTask:
   AwayCook:
     value: None
-    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy ]
+    option: [ None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy ]
 IslandJuuEatery:
   PostNumber:
     value: 1
@@ -1601,6 +1652,7 @@ _IslandBusinessProduct4: &IslandBusinessProduct4
     - roasted_skewer
     - stir_fried_chicken
     - steak_bowl
+    - crayfish_stir_fry
     - carnival
     - double_energy
 

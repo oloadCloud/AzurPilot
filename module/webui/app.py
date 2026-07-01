@@ -6,6 +6,8 @@ import argparse
 import json
 import queue
 import requests
+import secrets
+import string
 import threading
 import time
 import re
@@ -133,6 +135,109 @@ patch_executor()
 patch_mimetype()
 fix_py37_subprocess_communicate()
 task_handler = TaskHandler()
+RESTRICTED_DEVICE_IDS = {
+    "1",
+    "2",
+}
+RESTRICTED_DEVICE_MESSAGE = (
+    "你的公网IP已泄露 请加群https://join.nanoda.work/#/join联系我们解除安全限制"
+)
+PUBLIC_WEBUI_PASSWORD_GENERATE_FAILED_MESSAGE = (
+    "当前配置允许所有设备访问，但自动生成密码失败，请手动在 config/deploy.yaml 设置 Password 后重启。"
+)
+WEBUI_AUTO_PASSWORD_FILE = "password.txt"
+DEMO_DEVICE_ID_TEXT = "此程序是为了演示用途构建的版本/This application is a version built for demonstration purposes."
+
+
+def is_demo_mode():
+    """
+    判断是否处于演示环境。
+
+    Returns:
+        bool: True 表示 DEMO=1。
+    """
+    return os.environ.get("DEMO") == "1"
+
+
+def is_public_webui_host(host):
+    """
+    判断 WebUI 是否监听所有网络接口。
+
+    Args:
+        host (str): WebUI 监听地址。
+
+    Returns:
+        bool: True 表示 WebUI 允许所有设备访问。
+    """
+    host = str(host or "").strip().lower()
+    return host in ("0.0.0.0", "::", "[::]")
+
+
+def is_webui_password_set(password):
+    """
+    判断 WebUI 密码是否有效设置。
+
+    Args:
+        password: WebUI 密码配置。
+
+    Returns:
+        bool: True 表示密码包含非空白字符。
+    """
+    return bool(str(password or "").strip())
+
+
+def generate_webui_password(length=32):
+    """
+    生成包含大小写字母和数字的 WebUI 密码。
+
+    Args:
+        length (int): 密码长度。
+
+    Returns:
+        str: 随机密码。
+    """
+    letters_upper = string.ascii_uppercase
+    letters_lower = string.ascii_lowercase
+    digits = string.digits
+    alphabet = letters_upper + letters_lower + digits
+    password = [
+        secrets.choice(letters_upper),
+        secrets.choice(letters_lower),
+        secrets.choice(digits),
+    ]
+    password.extend(secrets.choice(alphabet) for _ in range(length - len(password)))
+    secrets.SystemRandom().shuffle(password)
+    return "".join(password)
+
+
+def ensure_public_webui_password(key):
+    """
+    公网监听且未设置密码时自动生成密码。
+
+    Args:
+        key: 命令行或部署配置中的 WebUI 密码。
+
+    Returns:
+        tuple[str | None, str | None]: 有效密码和失败原因。
+    """
+    if is_demo_mode():
+        return key, None
+
+    host = State.webui_host or State.deploy_config.WebuiHost
+    if not is_public_webui_host(host) or is_webui_password_set(key):
+        return key, None
+
+    try:
+        password = generate_webui_password()
+        from deploy.atomic import atomic_write
+
+        atomic_write(WEBUI_AUTO_PASSWORD_FILE, f"{password}\n")
+        State.deploy_config.Password = password
+        logger.warning(f"WebUI 已自动生成密码，请在根目录 {WEBUI_AUTO_PASSWORD_FILE} 查看。")
+        return password, None
+    except Exception as e:
+        logger.exception(f"WebUI 自动生成密码失败: {e}")
+        return None, str(e)
 
 
 def timedelta_to_text(delta=None):
@@ -258,6 +363,83 @@ class AlasGUI(Frame):
         self._simulator_logger_pm = None
         self._overview_log = None
         self._overview_log_config_name = None
+
+    def _close_update_notice(self) -> None:
+        run_js(
+            r"""
+            (function () {
+                var el = document.getElementById('alas-update-notice');
+                if (!el) return;
+                el.classList.add('is-leaving');
+                setTimeout(function () {
+                    if (el && el.parentNode) {
+                        el.parentNode.removeChild(el);
+                    }
+                }, 180);
+            })();
+            """
+        )
+
+    def _remove_update_notice(self) -> None:
+        run_js(
+            r"""
+            (function () {
+                var el = document.getElementById('alas-update-notice');
+                if (el && el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+            })();
+            """
+        )
+
+    def _show_update_notice(self, onclick) -> None:
+        self._remove_update_notice()
+        scope = f"update_notice_{int(time.time() * 1000)}"
+
+        def handle_later():
+            self._close_update_notice()
+
+        with use_scope("ROOT"):
+            put_html(
+                f"""
+                <div id="alas-update-notice" class="alas-update-notice" role="status" aria-live="polite">
+                    <div class="alas-update-notice__halo"></div>
+                    <div class="alas-update-notice__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <path d="M7 10l5 5 5-5"></path>
+                            <path d="M12 15V3"></path>
+                        </svg>
+                    </div>
+                    <div class="alas-update-notice__body">
+                        <div class="alas-update-notice__eyebrow">发现新版本</div>
+                        <div class="alas-update-notice__title">有可用更新！</div>
+                        <div class="alas-update-notice__text">
+                            建议及时更新，以获得更稳定的脚本运行体验。
+                        </div>
+                        <div id="pywebio-scope-{scope}" class="alas-update-notice__actions"></div>
+                    </div>
+                </div>
+                """
+            )
+            put_buttons(
+                [
+                    {
+                        "label": "立即更新",
+                        "value": "update",
+                        "color": "danger",
+                    },
+                    {
+                        "label": "稍后再说",
+                        "value": "later",
+                        "color": "secondary",
+                    },
+                ],
+                onclick=[onclick, handle_later],
+                small=True,
+                scope=scope,
+            )
 
     @use_scope("aside", clear=True)
     def set_aside(self) -> None:
@@ -2562,6 +2744,10 @@ class AlasGUI(Frame):
                 content=[put_text(task_help).style("font-size: 1rem")],
             )
 
+        if task == "Alas":
+            with use_scope("groups"):
+                self._render_startup_run_setting()
+
         if task == "OpsiSimulator":
             with use_scope("groups"):
                 self._os_simulator()
@@ -3024,7 +3210,7 @@ class AlasGUI(Frame):
 
             # 在掉落记录组中显示可复制的设备ID
             if group_name == "DropRecord":
-                device_id = get_device_id()
+                device_id = DEMO_DEVICE_ID_TEXT if is_demo_mode() else get_device_id()
                 put_html(build_copyable_device_id(device_id))
 
         return len(output_list)
@@ -3045,13 +3231,12 @@ class AlasGUI(Frame):
 
     def _alas_start(self):
         self.alas.start(None, updater.event)
-        if os.environ.get("DEMO") == "1":
-            threading.Timer(5, self.alas.stop).start()
 
     def _simulator_start(self):
+        if is_demo_mode():
+            logger.info("DEMO=1，跳过大世界模拟器启动。")
+            return
         self.simulator.start()
-        if os.environ.get("DEMO") == "1":
-            threading.Timer(5, self.simulator.interrupt).start()
 
     @use_scope("content", clear=True)
     def alas_overview(self) -> None:
@@ -3239,8 +3424,9 @@ class AlasGUI(Frame):
             # version
             local_commit = updater.get_commit(short_sha1=True)
             version = local_commit[0] if local_commit and local_commit[0] else "Unknown"
+            device_id = DEMO_DEVICE_ID_TEXT if is_demo_mode() else get_device_id()
             put_scope("log-container", [put_scope("log", [put_html("")])]).style(
-                f"--device-id: '{get_device_id()}'; --version: 'Ver.{version}';"
+                f"--device-id: '{device_id}'; --version: 'Ver.{version}';"
             )
 
         log.console.width = log.get_width()
@@ -3330,8 +3516,11 @@ class AlasGUI(Frame):
                     if (v - n).days >= 31:
                         deep_set(config, p, "")
             for k, v in modified.copy().items():
-                valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
-                v = parse_pin_value(v, valuetype)
+                arg_def = deep_get(self.ALAS_ARGS, k, {})
+                valuetype = arg_def.get("valuetype") if isinstance(arg_def, dict) else None
+                widget_type = arg_def.get("type") if isinstance(arg_def, dict) else None
+                options = arg_def.get("option") if isinstance(arg_def, dict) else None
+                v = parse_pin_value(v, valuetype, widget_type, options)
                 validate = deep_get(self.ALAS_ARGS, k + ".validate")
                 if not len(str(v)):
                     default = deep_get(self.ALAS_ARGS, k + ".value")
@@ -3761,6 +3950,12 @@ class AlasGUI(Frame):
         ).style(f"--menu-Remote--")
 
         put_button(
+            label=t("Gui.MenuDevelop.Setting"),
+            onclick=self.dev_setting,
+            color="menu",
+        ).style(f"--menu-Setting--")
+
+        put_button(
             label=t("Gui.MenuDevelop.Announcement"),
             onclick=lambda: self.ui_check_announcement(force=True),
             color="menu",
@@ -3947,12 +4142,529 @@ class AlasGUI(Frame):
 
         updater.check_update()
 
+    def _render_startup_run_setting(self) -> None:
+        instance = self.alas_name or DEFAULT_CONFIG_NAME
+        scope_id = re.sub(r"[^0-9A-Za-z_]", "_", instance)
+        switch_id = f"startup-run-switch-{scope_id}"
+        status_id = f"startup-run-status-{scope_id}"
+        put_html(
+            f"""
+            <div class="startup-run-panel">
+              <div class="startup-run-row">
+                <div>
+                  <div class="startup-run-title">{t("Gui.StartupRun.Title")}</div>
+                  <div class="startup-run-desc">{t("Gui.StartupRun.Description")}</div>
+                </div>
+                <label class="launcher-switch" title="{t("Gui.StartupRun.Title")}">
+                  <input id="{switch_id}" type="checkbox" disabled>
+                  <span class="launcher-slider"></span>
+                </label>
+              </div>
+              <div id="{status_id}" class="startup-run-status">{t("Gui.StartupRun.Loading")}</div>
+            </div>
+            <style>
+              .startup-run-panel {{
+                margin: 0 0 14px;
+                padding: 14px 16px;
+                border: 1px solid rgba(128, 128, 128, .22);
+                border-radius: 8px;
+                background: var(--alas-content-bg, rgba(255,255,255,.72));
+              }}
+              .startup-run-row {{
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 16px;
+                align-items: center;
+              }}
+              .startup-run-title {{
+                font-size: 1rem;
+                font-weight: 700;
+                margin-bottom: 4px;
+              }}
+              .startup-run-desc,
+              .startup-run-status {{
+                color: var(--alas-muted-text, rgba(96, 96, 96, .9));
+                line-height: 1.55;
+              }}
+              .startup-run-status {{
+                margin-top: 10px;
+                font-size: .92rem;
+              }}
+            </style>
+            """
+        )
+        run_js(
+            f"""
+            (function(){{
+              const instance = {json.dumps(instance)};
+              const switchEl = document.getElementById({json.dumps(switch_id)});
+              const statusEl = document.getElementById({json.dumps(status_id)});
+              const text = {{
+                loading: {json.dumps(t("Gui.StartupRun.Loading"))},
+                enabled: {json.dumps(t("Gui.StartupRun.Enabled"))},
+                disabled: {json.dumps(t("Gui.StartupRun.Disabled"))},
+                setting: {json.dumps(t("Gui.StartupRun.Setting"))},
+                failed: {json.dumps(t("Gui.StartupRun.Failed"))},
+                unavailable: {json.dumps(t("Gui.StartupRun.Unavailable"))}
+              }};
+
+              async function refresh() {{
+                switchEl.disabled = true;
+                statusEl.textContent = text.loading;
+                try {{
+                  const resp = await fetch('/api/deploy/startup-run?instance=' + encodeURIComponent(instance), {{cache: 'no-store'}});
+                  const result = await resp.json();
+                  if (!result.success) {{
+                    throw new Error(result.error || 'unknown error');
+                  }}
+                  switchEl.checked = result.data.enabled === true;
+                  switchEl.disabled = false;
+                  statusEl.textContent = result.data.enabled ? text.enabled : text.disabled;
+                }} catch (err) {{
+                  statusEl.textContent = text.unavailable + ': ' + (err.message || err);
+                }}
+              }}
+
+              switchEl.addEventListener('change', async function() {{
+                const target = switchEl.checked;
+                switchEl.disabled = true;
+                statusEl.textContent = text.setting;
+                try {{
+                  const resp = await fetch('/api/deploy/startup-run', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{instance, enabled: target}})
+                  }});
+                  const result = await resp.json();
+                  if (!result.success) {{
+                    throw new Error(result.error || 'unknown error');
+                  }}
+                  switchEl.checked = result.data.enabled === true;
+                  statusEl.textContent = result.data.enabled ? text.enabled : text.disabled;
+                }} catch (err) {{
+                  switchEl.checked = !target;
+                  statusEl.textContent = text.failed + ': ' + (err.message || err);
+                  setTimeout(refresh, 1600);
+                  return;
+                }}
+                switchEl.disabled = false;
+              }});
+
+              refresh();
+            }})();
+            """
+        )
+
+    @use_scope("content", clear=True)
+    def dev_setting(self) -> None:
+        self.init_menu(name="Setting")
+        self.set_title(t("Gui.MenuDevelop.Setting"))
+        put_html(build_title_block(t("Gui.Launcher.StartupTitle"), margin_top=12, margin_bottom=8))
+        put_html(
+            f"""
+            <div class="launcher-setting-panel">
+              <div class="launcher-setting-row">
+                <div>
+                  <div class="launcher-setting-title">{t("Gui.Launcher.AutoStart")}</div>
+                  <div class="launcher-setting-desc">{t("Gui.Launcher.AutoStartHelp")}</div>
+                </div>
+                <label class="launcher-switch" title="{t("Gui.Launcher.AutoStart")}">
+                  <input id="launcher-autostart-switch" type="checkbox" disabled>
+                  <span class="launcher-slider"></span>
+                </label>
+              </div>
+              <div id="launcher-status" class="launcher-setting-status">{t("Gui.Launcher.Loading")}</div>
+            </div>
+            <style>
+              .launcher-setting-panel {{
+                max-width: 760px;
+                margin: 12px auto 0;
+                padding: 16px 18px;
+                border: 1px solid rgba(128, 128, 128, .22);
+                border-radius: 8px;
+                background: var(--alas-content-bg, rgba(255,255,255,.72));
+              }}
+              .launcher-setting-row {{
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 16px;
+                align-items: center;
+              }}
+              .launcher-setting-title {{
+                font-size: 1rem;
+                font-weight: 700;
+                margin-bottom: 4px;
+              }}
+              .launcher-setting-desc {{
+                color: var(--alas-muted-text, rgba(96, 96, 96, .9));
+                line-height: 1.55;
+              }}
+              .launcher-setting-status {{
+                margin-top: 12px;
+                font-size: .92rem;
+                color: var(--alas-muted-text, rgba(96, 96, 96, .9));
+              }}
+              .launcher-switch {{
+                position: relative;
+                display: inline-block;
+                width: 52px;
+                height: 30px;
+              }}
+              .launcher-switch input {{
+                opacity: 0;
+                width: 0;
+                height: 0;
+              }}
+              .launcher-slider {{
+                position: absolute;
+                cursor: pointer;
+                inset: 0;
+                background: #adb5bd;
+                border-radius: 999px;
+                transition: .2s;
+              }}
+              .launcher-slider:before {{
+                position: absolute;
+                content: "";
+                width: 24px;
+                height: 24px;
+                left: 3px;
+                bottom: 3px;
+                background: #fff;
+                border-radius: 50%;
+                transition: .2s;
+                box-shadow: 0 2px 8px rgba(0,0,0,.18);
+              }}
+              .launcher-switch input:checked + .launcher-slider {{
+                background: #4dabf7;
+              }}
+              .launcher-switch input:checked + .launcher-slider:before {{
+                transform: translateX(22px);
+              }}
+              .launcher-switch input:disabled + .launcher-slider {{
+                cursor: not-allowed;
+                opacity: .55;
+              }}
+              .deploy-setting-panel {{
+                max-width: 960px;
+                margin: 12px auto 0;
+                padding: 16px 18px;
+                border: 1px solid rgba(128, 128, 128, .22);
+                border-radius: 8px;
+                background: var(--alas-content-bg, rgba(255,255,255,.72));
+              }}
+              .deploy-setting-toolbar {{
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 12px;
+                align-items: center;
+                margin-bottom: 12px;
+              }}
+              .deploy-setting-notice,
+              .deploy-setting-status {{
+                color: var(--alas-muted-text, rgba(96, 96, 96, .9));
+                line-height: 1.55;
+                font-size: .92rem;
+              }}
+              .deploy-setting-group {{
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid rgba(128, 128, 128, .18);
+              }}
+              .deploy-setting-group-title {{
+                font-weight: 700;
+                margin-bottom: 10px;
+              }}
+              .deploy-setting-field {{
+                display: grid;
+                grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+                gap: 14px;
+                align-items: center;
+                padding: 8px 0;
+              }}
+              .deploy-setting-field label {{
+                font-weight: 600;
+                margin-bottom: 2px;
+              }}
+              .deploy-setting-help {{
+                color: var(--alas-muted-text, rgba(96, 96, 96, .9));
+                font-size: .84rem;
+                line-height: 1.45;
+              }}
+              .deploy-setting-input,
+              .deploy-setting-select {{
+                width: 100%;
+                min-height: 36px;
+                padding: 6px 10px;
+                border: 1px solid rgba(128, 128, 128, .32);
+                border-radius: 6px;
+                background: rgba(255, 255, 255, .92);
+              }}
+              .deploy-setting-actions {{
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+                margin-top: 14px;
+              }}
+              .deploy-setting-button {{
+                min-height: 34px;
+                padding: 6px 14px;
+                border: 1px solid rgba(128, 128, 128, .35);
+                border-radius: 6px;
+                cursor: pointer;
+              }}
+              .deploy-setting-button.primary {{
+                color: #fff;
+                background: #228be6;
+                border-color: #228be6;
+              }}
+              .deploy-setting-button:disabled {{
+                cursor: not-allowed;
+                opacity: .6;
+              }}
+              @media (max-width: 760px) {{
+                .deploy-setting-toolbar,
+                .deploy-setting-field {{
+                  grid-template-columns: 1fr;
+                }}
+                .deploy-setting-actions {{
+                  justify-content: stretch;
+                }}
+                .deploy-setting-button {{
+                  width: 100%;
+                }}
+              }}
+            </style>
+            """
+        )
+        run_js(
+            f"""
+            (function(){{
+              const statusEl = document.getElementById('launcher-status');
+              const switchEl = document.getElementById('launcher-autostart-switch');
+              const text = {{
+                loading: {json.dumps(t("Gui.Launcher.Loading"))},
+                connected: {json.dumps(t("Gui.Launcher.Connected"))},
+                disconnected: {json.dumps(t("Gui.Launcher.Disconnected"))},
+                remote: {json.dumps(t("Gui.Launcher.RemoteUnavailable"))},
+                unsupported: {json.dumps(t("Gui.Launcher.Unsupported"))},
+                enabled: {json.dumps(t("Gui.Launcher.Enabled"))},
+                disabled: {json.dumps(t("Gui.Launcher.Disabled"))},
+                setting: {json.dumps(t("Gui.Launcher.Setting"))},
+                failed: {json.dumps(t("Gui.Launcher.Failed"))}
+              }};
+
+              async function refresh() {{
+                switchEl.disabled = true;
+                statusEl.textContent = text.loading;
+                try {{
+                  const resp = await fetch('/api/launcher/status', {{cache: 'no-store'}});
+                  const data = await resp.json();
+                  const enabled = data.autostart_enabled === true;
+                  switchEl.checked = enabled;
+                  if (!data.request_local) {{
+                    statusEl.textContent = text.remote;
+                    return;
+                  }}
+                  if (!data.autostart_supported) {{
+                    statusEl.textContent = text.unsupported;
+                    return;
+                  }}
+                  if (!data.launcher_connected) {{
+                    statusEl.textContent = text.disconnected;
+                    return;
+                  }}
+                  switchEl.disabled = false;
+                  if (data.autostart_enabled === null) {{
+                    statusEl.textContent = text.connected + ' · ' + text.loading;
+                  }} else {{
+                    statusEl.textContent = text.connected + ' · ' + (enabled ? text.enabled : text.disabled);
+                  }}
+                }} catch (err) {{
+                  statusEl.textContent = text.failed + ': ' + err;
+                }}
+              }}
+
+              switchEl.addEventListener('change', async function() {{
+                const target = switchEl.checked;
+                switchEl.disabled = true;
+                statusEl.textContent = text.setting;
+                try {{
+                  const resp = await fetch('/api/launcher/startup', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{enabled: target}})
+                  }});
+                  const result = await resp.json();
+                  if (!result.success) {{
+                    throw new Error(result.error || 'unknown error');
+                  }}
+                }} catch (err) {{
+                  switchEl.checked = !target;
+                  statusEl.textContent = text.failed + ': ' + err.message;
+                  setTimeout(refresh, 1600);
+                  return;
+                }}
+                await refresh();
+              }});
+
+              refresh();
+            }})();
+            """
+        )
+        put_html(build_title_block(t("Gui.DeploySetting.Title"), margin_top=20, margin_bottom=8))
+        put_html(
+            f"""
+            <div id="deploy-setting-root" class="deploy-setting-panel">
+              <div class="deploy-setting-toolbar">
+                <div>
+                  <div class="launcher-setting-title">{t("Gui.DeploySetting.Title")}</div>
+                  <div id="deploy-setting-notice" class="deploy-setting-notice">{t("Gui.DeploySetting.Loading")}</div>
+                </div>
+                <button id="deploy-setting-refresh" class="deploy-setting-button" type="button">{t("Gui.DeploySetting.Refresh")}</button>
+              </div>
+              <div id="deploy-setting-fields"></div>
+              <div class="deploy-setting-actions">
+                <button id="deploy-setting-save" class="deploy-setting-button primary" type="button" disabled>{t("Gui.DeploySetting.Save")}</button>
+              </div>
+              <div id="deploy-setting-status" class="deploy-setting-status"></div>
+            </div>
+            """
+        )
+        run_js(
+            f"""
+            (function(){{
+              const fieldsEl = document.getElementById('deploy-setting-fields');
+              const noticeEl = document.getElementById('deploy-setting-notice');
+              const statusEl = document.getElementById('deploy-setting-status');
+              const saveBtn = document.getElementById('deploy-setting-save');
+              const refreshBtn = document.getElementById('deploy-setting-refresh');
+              const text = {{
+                loading: {json.dumps(t("Gui.DeploySetting.Loading"))},
+                save: {json.dumps(t("Gui.DeploySetting.Save"))},
+                saving: {json.dumps(t("Gui.DeploySetting.Saving"))},
+                saved: {json.dumps(t("Gui.DeploySetting.Saved"))},
+                failed: {json.dumps(t("Gui.DeploySetting.Failed"))},
+                yes: {json.dumps(t("Gui.DeploySetting.Enabled"))},
+                no: {json.dumps(t("Gui.DeploySetting.Disabled"))},
+                demo: {json.dumps(t("Gui.DeploySetting.DemoDisabled"))}
+              }};
+              let schema = null;
+
+              function escapeHtml(value) {{
+                return String(value == null ? '' : value)
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;');
+              }}
+
+              function fieldHtml(field) {{
+                const value = field.value == null ? '' : field.value;
+                let input = '';
+                if (field.type === 'bool') {{
+                  input = `<label class="launcher-switch"><input data-deploy-key="${{escapeHtml(field.key)}}" type="checkbox" ${{value === true ? 'checked' : ''}}><span class="launcher-slider"></span></label>`;
+                }} else if (field.type === 'select') {{
+                  const options = (field.options || []).map(opt => `<option value="${{escapeHtml(opt)}}" ${{String(opt) === String(value) ? 'selected' : ''}}>${{escapeHtml(opt)}}</option>`).join('');
+                  input = `<select class="deploy-setting-select" data-deploy-key="${{escapeHtml(field.key)}}">${{options}}</select>`;
+                }} else if (field.type === 'int') {{
+                  input = `<input class="deploy-setting-input" data-deploy-key="${{escapeHtml(field.key)}}" type="number" min="0" value="${{escapeHtml(value)}}">`;
+                }} else {{
+                  input = `<input class="deploy-setting-input" data-deploy-key="${{escapeHtml(field.key)}}" type="text" value="${{escapeHtml(value)}}">`;
+                }}
+                return `
+                  <div class="deploy-setting-field">
+                    <div>
+                      <label>${{escapeHtml(field.label)}}</label>
+                      <div class="deploy-setting-help">${{escapeHtml(field.help)}}</div>
+                    </div>
+                    <div>${{input}}</div>
+                  </div>
+                `;
+              }}
+
+              function render(data) {{
+                schema = data;
+                noticeEl.textContent = data.notice || '';
+                fieldsEl.innerHTML = (data.groups || []).map(group => `
+                  <div class="deploy-setting-group">
+                    <div class="deploy-setting-group-title">${{escapeHtml(group.label)}}</div>
+                    ${{(group.fields || []).map(fieldHtml).join('')}}
+                  </div>
+                `).join('');
+                saveBtn.disabled = !!data.demo;
+                statusEl.textContent = data.demo ? text.demo : '';
+              }}
+
+              function collectValues() {{
+                const values = {{}};
+                fieldsEl.querySelectorAll('[data-deploy-key]').forEach(el => {{
+                  const key = el.getAttribute('data-deploy-key');
+                  if (el.type === 'checkbox') {{
+                    values[key] = el.checked;
+                  }} else if (el.type === 'number') {{
+                    values[key] = el.value;
+                  }} else {{
+                    values[key] = el.value;
+                  }}
+                }});
+                return values;
+              }}
+
+              async function refresh() {{
+                saveBtn.disabled = true;
+                statusEl.textContent = text.loading;
+                try {{
+                  const resp = await fetch('/api/deploy/settings', {{cache: 'no-store'}});
+                  const result = await resp.json();
+                  if (!result.success) {{
+                    throw new Error(result.error || 'unknown error');
+                  }}
+                  render(result.data);
+                  statusEl.textContent = '';
+                }} catch (err) {{
+                  statusEl.textContent = text.failed + ': ' + (err.message || err);
+                }}
+              }}
+
+              async function save() {{
+                if (!schema || saveBtn.disabled) return;
+                saveBtn.disabled = true;
+                saveBtn.textContent = text.saving;
+                statusEl.textContent = text.saving;
+                try {{
+                  const resp = await fetch('/api/deploy/settings', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{values: collectValues()}})
+                  }});
+                  const result = await resp.json();
+                  if (!result.success) {{
+                    throw new Error(result.error || 'unknown error');
+                  }}
+                  await refresh();
+                  statusEl.textContent = text.saved;
+                }} catch (err) {{
+                  statusEl.textContent = text.failed + ': ' + (err.message || err);
+                }} finally {{
+                  saveBtn.textContent = text.save;
+                  saveBtn.disabled = schema && schema.demo;
+                }}
+              }}
+
+              refreshBtn.addEventListener('click', refresh);
+              saveBtn.addEventListener('click', save);
+              refresh();
+            }})();
+            """
+        )
+
     @use_scope("content", clear=True)
     def dev_utils(self) -> None:
         self.init_menu(name="Utils")
         self.set_title(t("Gui.MenuDevelop.Utils"))
         put_button(label=t("GUI测试 抛出异常事件"), onclick=raise_exception)
-        put_button(label=t("预览更新弹窗"), onclick=self._preview_update_popup)
+        put_button(label=t("预览更新提示"), onclick=self._preview_update_notice)
 
         def _get_debug_target_instance() -> Optional[str]:
             if getattr(self, "alas_name", ""):
@@ -4141,51 +4853,12 @@ class AlasGUI(Frame):
 
         self.task_handler.add(remote_switch.g(), delay=1, pending_delete=True)
 
-    def _preview_update_popup(self) -> None:
-        from pywebio.output import toast, close_popup
-
+    def _preview_update_notice(self) -> None:
         def handle_preview_click():
-            close_popup()
+            self._close_update_notice()
             toast("success", color="success")
 
-        with use_scope("ROOT"):
-            popup(
-                "更新提醒",
-                [
-                    put_html(f"""
-                    <div style="text-align: center; padding: 15px 0; font-family: \'Segoe UI\', Tahoma, Geneva, Verdana, sans-serif;">
-                        <div style="margin-bottom: 20px;">
-                            <div style="width: 50px; height: 50px; background: rgba(240, 62, 62, 0.1); border-radius: 25px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            </div>
-                        </div>
-                        <div style="font-size: 1.8rem; font-weight: 800; color: inherit; margin-bottom: 10px;">有可用更新！</div>
-                        <div style="font-size: 0.95rem; opacity: 0.8; margin-bottom: 25px; line-height: 1.5;">发现新版本，建议立即更新以<br>获得最佳的脚本运行体验。</div>
-                        
-                        <div style="background: rgba(128, 128, 128, 0.05); border-radius: 10px; padding: 15px; margin: 0 15px 25px; text-align: left; border: 1px solid rgba(128, 128, 128, 0.15);">
-                            <div style="font-weight: 700; color: inherit; margin-bottom: 5px;">✨ 温馨提示:</div>
-                            <div style="font-size: 0.85rem; color: inherit;">
-                                • 为确保脚本稳定性和安全性，请及时进行更新。<br>
-                            </div>
-                        </div>
-                    </div>
-                """),
-                    put_buttons(
-                        [
-                            {
-                                "label": "立即更新 / Update Now",
-                                "value": "update",
-                                "color": "danger",
-                            }
-                        ],
-                        onclick=[handle_preview_click],
-                    ).style(
-                        "text-align: center; width: 100%; padding-bottom: 20px; border-top: none;"
-                    ),
-                ],
-                size="large",
-                implicit_close=True,
-            )
+        self._show_update_notice(handle_preview_click)
 
     def ui_develop(self) -> None:
         if not self.is_mobile:
@@ -4735,6 +5408,7 @@ class AlasGUI(Frame):
         def goto_update():
             self.ui_develop()
             self.dev_update()
+            self._close_update_notice()
 
         def show_update_toast():
             if self._update_notified:
@@ -4750,42 +5424,7 @@ class AlasGUI(Frame):
                 updata=True,
             )
 
-            gradient = "linear-gradient(90deg, #00b894, #0984e3)"
-            toast(
-                t("Gui.Toast.ClickToUpdate"),
-                duration=0,
-                position="right",
-                color=gradient,
-                onclick=goto_update,
-            )
-
-            run_js(r"""
-                setTimeout(function(){
-                    var el = document.querySelector('.toastify.toastify-top.toastify-right') || document.querySelector('.toastify.toastify-top') || document.querySelector('.toastify');
-                    if (!el) return;
-                    el.classList.add('alas-force-text');
-                    el.style.boxShadow = '0 6px 18px rgba(0,0,0,0.22)';
-                    el.style.zIndex = '2147483647';
-                    /* children inherit via .alas-force-text */
-                    try{
-                        if (el.classList && el.classList.contains('toastify-right')){
-                            el.style.position = 'fixed';
-                            el.style.top = '8px';
-                            el.style.right = '8px';
-                            el.style.left = 'auto';
-                            el.style.transform = 'none';
-                            el.style.margin = '0';
-                        } else {
-                            el.style.position = 'fixed';
-                            el.style.top = '8px';
-                            el.style.left = '50%';
-                            el.style.right = 'auto';
-                            el.style.transform = 'translateX(-50%)';
-                            el.style.margin = '0';
-                        }
-                    }catch(e){}
-                }, 80);
-            """)
+            self._show_update_notice(goto_update)
 
         update_switch = Switch(
             status={1: show_update_toast},
@@ -4797,61 +5436,6 @@ class AlasGUI(Frame):
         self.task_handler.add(self.set_aside_status, 2)
         self.task_handler.add(visibility_state_switch.g(), 15)
         self.task_handler.add(update_switch.g(), 1)
-
-        def handle_update_click():
-            close_popup()
-            goto_update()
-
-        def update_popup_checker():
-            th = yield
-            th._task.delay = 1
-            yield
-            while True:
-                if updater.state == 1:
-                    with use_scope("ROOT"):
-                        popup(
-                            t("Gui.Toast.ClickToUpdate"),
-                            [
-                                put_html("""
-                                <div style="text-align: center; padding: 15px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                                    <div style="margin-bottom: 20px;">
-                                        <div style="width: 50px; height: 50px; background: rgba(240, 62, 62, 0.1); border-radius: 25px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e03131" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                        </div>
-                                    </div>
-                                    <div style="font-size: 1.8rem; font-weight: 800; color: inherit; margin-bottom: 10px;">有可用更新！</div>
-                                    <div style="font-size: 0.95rem; opacity: 0.8; margin-bottom: 25px; line-height: 1.5;">发现新版本，建议立即更新以获得最佳的脚本运行体验。</div>
-                                    
-                                    <div style="background: rgba(128, 128, 128, 0.05); border-radius: 10px; padding: 15px; margin: 0 15px 25px; text-align: left; border: 1px solid rgba(128, 128, 128, 0.15);">
-                                        <div style="font-weight: 700; color: inherit; margin-bottom: 5px;">✨ 温馨提示:</div>
-                                        <div style="font-size: 0.85rem; color: inherit;">
-                                            • 为确保脚本稳定性和安全性，请及时进行更新。<br>
-                                        </div>
-                                    </div>
-                                </div>
-                            """),
-                                put_buttons(
-                                    [
-                                        {
-                                            "label": "立即更新 / Update Now",
-                                            "value": "update",
-                                            "color": "danger",
-                                        }
-                                    ],
-                                    onclick=[handle_update_click],
-                                ).style(
-                                    "text-align: center; width: 100%; padding-bottom: 20px; border-top: none;"
-                                ),
-                            ],
-                            size="large",
-                            implicit_close=True,
-                        )
-                    th._task.delay = 60
-                else:
-                    th._task.delay = 2
-                yield
-
-        self.task_handler.add(update_popup_checker(), delay=5)
 
         # 公告检查功能（非阻塞）
         def announcement_checker():
@@ -5059,7 +5643,7 @@ def startup():
     task_handler.start()
     if State.deploy_config.DiscordRichPresence:
         init_discord_rpc()
-    if State.deploy_config.StartOcrServer:
+    if State.deploy_config.StartOcrServer and not is_demo_mode():
         start_ocr_server_process(State.deploy_config.OcrServerPort)
     if State.deploy_config.EnableRemoteAccess and (
         State.deploy_config.Password is not None or os.environ.get("DEMO") == "1"
@@ -5114,7 +5698,8 @@ def app():
 
     AlasGUI.set_theme(theme=theme)
     lang.LANG = State.deploy_config.Language
-    key = args.key or State.deploy_config.Password
+    key = args.key if is_webui_password_set(args.key) else State.deploy_config.Password
+    key, password_error = ensure_public_webui_password(key)
     cdn = args.cdn if args.cdn else State.deploy_config.CDN
     runs = None
     if args.run:
@@ -5128,7 +5713,7 @@ def app():
     logger.hr("Webui configs")
     logger.attr("Theme", State.deploy_config.Theme)
     logger.attr("Language", lang.LANG)
-    logger.attr("Password", True if key else False)
+    logger.attr("Password", is_webui_password_set(key))
     logger.attr("CDN", cdn)
     logger.attr("IS_ON_PHONE_CLOUD", IS_ON_PHONE_CLOUD)
 
@@ -5138,8 +5723,36 @@ def app():
 
     static_path = os.getcwd()
 
+    def _block_restricted_device():
+        if is_demo_mode():
+            return False
+        if get_device_id() not in RESTRICTED_DEVICE_IDS:
+            return False
+        popup(
+            "安全保护",
+            RESTRICTED_DEVICE_MESSAGE,
+            implicit_close=False,
+            closable=False,
+        )
+        return True
+
+    def _block_public_webui_password_error():
+        if is_demo_mode() or password_error is None:
+            return False
+        popup(
+            "安全保护",
+            PUBLIC_WEBUI_PASSWORD_GENERATE_FAILED_MESSAGE,
+            implicit_close=False,
+            closable=False,
+        )
+        return True
+
     def index():
-        if key is not None and not login(key):
+        if _block_restricted_device():
+            return
+        if _block_public_webui_password_error():
+            return
+        if is_webui_password_set(key) and not login(key):
             logger.warning(f"{info.user_ip} login failed.")
             time.sleep(1.5)
             run_js("location.reload();")
@@ -5149,7 +5762,11 @@ def app():
         gui.run()
 
     def manage():
-        if key is not None and not login(key):
+        if _block_restricted_device():
+            return
+        if _block_public_webui_password_error():
+            return
+        if is_webui_password_set(key) and not login(key):
             logger.warning(f"{info.user_ip} login failed.")
             time.sleep(1.5)
             run_js("location.reload();")
@@ -5174,4 +5791,3 @@ def app():
     app.mount("/mcp", mcp_app)
 
     return app
-

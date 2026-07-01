@@ -542,7 +542,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def handle_exp_info(self):
         """
-        处理经验结算画面（S/A/B 评价）。
+        处理经验结算画面（S/A/B/C/D 评价）。
 
         Returns:
             是否点击了经验结算画面。
@@ -556,6 +556,12 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             self.device.sleep((0.25, 0.5))
             return True
         if self.appear_then_click(EXP_INFO_B):
+            self.device.sleep((0.25, 0.5))
+            return True
+        if self.appear_then_click(EXP_INFO_C):
+            self.device.sleep((0.25, 0.5))
+            return True
+        if self.appear_then_click(EXP_INFO_D):
             self.device.sleep((0.25, 0.5))
             return True
 
@@ -644,7 +650,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.handle_story_skip(drop=drop):
                 continue
             # 处理战斗结算画面
-            if not exp_info and self.handle_get_ship(drop=drop):
+            if self.handle_get_ship(drop=drop):
                 continue
             if self.handle_get_items(drop=drop):
                 continue

@@ -348,11 +348,11 @@
     },
     "IslandDailyInteract": {
       "name": "每日/周任务",
-      "help": "处理岛屿摸猫、JUU速运、商区外送服务与每周照相任务。相关按钮资源生成后可启用。"
+      "help": "仅支持minitouch。处理岛屿摸猫、JUU速运、商区外送服务与每周照相任务。相关按钮资源生成后可启用。"
     },
     "IslandPearlSell": {
       "name": "每周珍珠采购与售卖",
-      "help": "每周二 01:00 自动处理珍珠：先采购本周珍珠，再售卖已有珍珠。仅支持minitouch。金币一定要够购买200x220个这是最低要求能一次买光本周珍珠, 否则可能会报错."
+      "help": "仅支持minitouch。每周二 01:00 自动处理珍珠：先采购本周珍珠，再售卖已有珍珠。金币一定要够购买200x220个这是最低要求能一次买光本周珍珠, 否则可能会报错."
     },
     "Daemon": {
       "name": "半自动点击",
@@ -400,7 +400,7 @@
       "name": "启用该功能",
       "help": "将这个任务加入调度器\n委托、科研、收获任务是强制打开的",
       "True": "已启用",
-      "False": "False"
+      "False": "关闭"
     },
     "PushNotification": {
       "name": "推送通知",
@@ -431,8 +431,24 @@
     "Sensitive": {
       "name": "敏感任务",
       "help": "出错时禁止重启游戏，直接停止 AzurPilot 运行。适用于跨月每日、隐秘海域、深渊海域等关键时刻任务。",
-      "True": "True",
-      "False": "False"
+      "True": "是",
+      "False": "否"
+    }
+  },
+  "Restart": {
+    "_info": {
+      "name": "重启设置",
+      "help": ""
+    },
+    "RandomDelay": {
+      "name": "每日重启随机延后",
+      "help": "每天重启客户端时，在服务器刷新时间后随机延后 X 分钟再执行，用于错开多个客户端登录。\n支持单个数字或区间，例如 5, 50；填 0 可关闭。"
+    },
+    "ClearCache": {
+      "name": "重启时同时清理缓存",
+      "help": "重启客户端时，在强行停止应用后删除 /sdcard/Android/data/<包名>/cache/ 下的外部缓存文件。",
+      "True": "开启",
+      "False": "关闭"
     }
   },
   "Emulator": {
@@ -615,8 +631,8 @@
     "EnableRemoteSSH": {
       "name": "启用远程 SSH 管理",
       "help": "在重启模拟器之前，通过 SSH 在远程服务器上执行特定指令（如重启 Docker 容器）。",
-      "True": "True",
-      "False": "False"
+      "True": "开启",
+      "False": "关闭"
     },
     "RemoteSSHHost": {
       "name": "远程服务器地址",
@@ -1072,6 +1088,7 @@
       "event_20260326_cn": "漫游者招募计划",
       "event_20260417_cn": "假日航线闪耀海滨",
       "event_20260520_cn": "圣印前的同盟",
+      "event_20260625_cn": "美梦巡演奇妙夜",
       "raid_20200624": "复刻特别演习埃塞克斯级",
       "raid_20210708": "复刻穿越彼方的水线",
       "raid_20220127": "演习神秘事件调查",
@@ -1167,8 +1184,11 @@
       "help": "使用游戏内置的推荐阵容自动完成困难图配队"
     },
     "DefeatWithdraw": {
-      "name": "道中战斗失败撤退",
-      "help": "道中战斗战败时的处理方式。开启时直接退出海域，关闭时尝试由另一队接管后续战斗。"
+      "name": "道中失败处理",
+      "help": "道中战斗战败时的处理方式，撤退后关闭任务需连续3次战败才会关闭",
+      "withdraw_continue": "撤退后继续任务",
+      "switch_fleet": "切换队伍继续出击",
+      "withdraw_stop": "撤退后关闭任务"
     }
   },
   "StopCondition": {
@@ -1209,6 +1229,28 @@
     "ReachLevel": {
       "name": "舰船升至 X 级后停止",
       "help": "任意等级低于 X 的舰船升级至 X 级后停止\n0 表示不限制等级"
+    }
+  },
+  "WarArchives": {
+    "_info": {
+      "name": "作战档案",
+      "help": ""
+    },
+    "DailyRunCount": {
+      "name": "每日出击次数",
+      "help": "每天最多运行作战档案多少次。\n0 表示不限制。\n达到次数后会延迟到下一次服务器刷新，不会关闭任务。"
+    },
+    "DailyRunCountRemain": {
+      "name": "今日剩余出击次数",
+      "help": "脚本自动维护的今日剩余额度。"
+    },
+    "DailyRunCountRecord": {
+      "name": "每日出击次数记录时间",
+      "help": "脚本自动维护的额度记录时间，用于服务器刷新后重置。"
+    },
+    "DailyRunCountLimit": {
+      "name": "上次每日出击次数",
+      "help": "脚本自动维护的上次每日次数设置，用于调整额度。"
     }
   },
   "Fleet": {
@@ -1323,7 +1365,7 @@
     },
     "DistanceToBoss": {
       "name": "BOSS战前将潜艇移动到BOSS附近",
-      "help": "仅在\"潜艇出击方案\"为\"仅BOSS战\"及\"狩猎及BOSS战\",时生效\n选择\"距离BOSS X格\"需要保证潜艇狩猎范围能覆盖到BOSS，距离使用曼哈顿距离计算，选择\"使用远洋支援\"需要潜艇队伍里有U522/达芬奇",
+      "help": "仅在\"潜艇出击方案\"为\"仅BOSS战\"及\"狩猎及BOSS战\"时生效\n选择\"距离BOSS X格\"需要保证潜艇狩猎范围能覆盖到BOSS，距离使用曼哈顿距离计算，选择\"使用远洋支援\"需要潜艇队伍里有U522/达芬奇",
       "to_boss_position": "至 BOSS 所在位置",
       "1_grid_to_boss": "距离 BOSS 1 格",
       "2_grid_to_boss": "距离 BOSS 2 格",
@@ -1468,7 +1510,7 @@
   },
   "C72MysteryFarming": {
     "_info": {
-      "name": "7-2 三站拣垃圾",
+      "name": "7-2 三战拣垃圾",
       "help": "打三战，拣完问号后撤退"
     },
     "StepOnA3": {
@@ -1873,7 +1915,7 @@
       "help": ""
     },
     "Favorite": {
-      "name": "优先选择常用",
+      "name": "仅选择常用角色",
       "help": ""
     },
     "MinLevel": {
@@ -2017,7 +2059,7 @@
     },
     "Mode": {
       "name": "训练模式",
-      "help": "无缝练猫将每隔 2.5 ~ 3.5 小时收取指挥猫\n每天收一只意思是每天收一只，周日收全部、强化并重新填充队列，以完成每周任务",
+      "help": "无缝练猫将每隔 2.5 ~ 3.5 小时收取指挥喵\n每天收一只意思是每天收一只，周日收全部、强化并重新填充队列，以完成每周任务",
       "seamlessly": "无缝练猫",
       "once_a_day": "每天收一只"
     },
@@ -2147,7 +2189,7 @@
     },
     "BuySkinBox": {
       "name": "买外观装备箱",
-      "help": "为降低维护成本，过滤器中的外观箱选择器不会随游戏更新，但Alas会将任何未知的，数量为1的，消耗7000物资的物品视为外观箱，并购买"
+      "help": "为降低维护成本，过滤器中的外观箱选择器不会随游戏更新，但AzurPilot会将任何未知的，数量为1的，消耗7000物资的物品视为外观箱，并购买"
     },
     "ConsumeCoins": {
       "name": "消耗溢出物资",
@@ -2584,7 +2626,8 @@
       "sirius": "天狼星",
       "new_jersey": "新泽西",
       "taihou": "鹩",
-      "aegir": "埃吉尔"
+      "aegir": "埃吉尔",
+      "nakhimov": "纳希莫夫"
     }
   },
   "Daily": {
@@ -3059,8 +3102,8 @@
       "help": "开启后将带来额外的行动力消耗，一般不用打开，慢慢打就好"
     },
     "HasStronghold": {
-      "name": "OpsiStronghold.HasStronghold.name",
-      "help": "OpsiStronghold.HasStronghold.help"
+      "name": "塞壬要塞",
+      "help": "检测到塞壬要塞时执行"
     }
   },
   "OpsiMonthBoss": {
@@ -3091,6 +3134,10 @@
     "ActionPointPreserve": {
       "name": "保留 X 点行动力",
       "help": "行动力低于 X 后停止，自动打开行动力箱子，X 包含箱子中的行动力，建议保留3000行动力给侵蚀1练级\n这个值将在大世界重置前3天自动减少至200点，如果启用侵蚀1练级则改为1000点，并在最后一天自动减少至0点"
+    },
+    "SmartNaturalAPCleanup": {
+      "name": "智能调度自然行动力清理",
+      "help": "智能调度拉起短猫清理自然恢复行动力时使用的一次性隐藏标记。"
     },
     "HazardLevel": {
       "name": "侵蚀等级",
@@ -3160,8 +3207,8 @@
     "SkipHpCheck": {
       "name": "献祭流跳过血量检测",
       "help": "开启后跳过战斗后的血量检测，即使船沉了也不会停止练级",
-      "True": "True",
-      "False": "False"
+      "True": "开启",
+      "False": "关闭"
     },
     "Cl1Filter": {
       "name": "明石购买筛选",
@@ -3271,8 +3318,8 @@
     "UseSmartSchedulingOperationCoinsPreserve": {
       "name": "获取 X 个作战补给凭证",
       "help": "启用后将使用下方设置的 获取 X 个作战补给凭证 的配置，禁用则使用侵蚀1练级 黄币保留配置\n关闭后将使用行动力控制\n打开后使用黄币控制",
-      "True": "True",
-      "False": "False"
+      "True": "开启",
+      "False": "关闭"
     },
     "OperationCoinsPreserve": {
       "name": "侵蚀1练级 保留 X 个作战补给凭证",
@@ -3281,6 +3328,16 @@
     "ActionPointPreserve": {
       "name": "短猫相接 保留 X 点行动力",
       "help": "行动力低于 X 后停止，自动打开行动力箱子，X 包含箱子中的行动力，建议保留1000行动力给侵蚀1练级"
+    },
+    "ActionPointEarlyTriggerEnable": {
+      "name": "行动力提前调度",
+      "help": "启用后在侵蚀一或短猫结束时记录自然行动力，并按每 10 分钟回复 1 点行动力计算智能调度下次运行时间，避免自然行动力溢出。",
+      "True": "开启",
+      "False": "关闭"
+    },
+    "ActionPointEarlyTriggerThreshold": {
+      "name": "提前调度行动力阈值",
+      "help": "自然行动力恢复到 X 时再次运行智能调度。默认 200，适合在行动力接近自然上限时重新决定执行侵蚀一或短猫。"
     },
     "OperationCoinsReturnThreshold": {
       "name": "获取 X 个作战补给凭证",
@@ -3353,6 +3410,10 @@
       "3": "3",
       "4": "4"
     },
+    "WorkerFilter": {
+      "name": "农田使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
+    },
     "MinFarm": {
       "name": "农田作物底线",
       "help": "建议660及以上"
@@ -3379,6 +3440,10 @@
       "2": "2",
       "3": "3",
       "4": "4"
+    },
+    "WorkerFilter": {
+      "name": "果园使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "MinOrchard": {
       "name": "水果底线",
@@ -3412,6 +3477,10 @@
       "help": "",
       "1": "1",
       "2": "2"
+    },
+    "WorkerFilter": {
+      "name": "苗圃使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "MinNursery": {
       "name": "苗圃作物底线",
@@ -3448,11 +3517,15 @@
     },
     "RancherFilter": {
       "name": "使用角色",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "Wool": {
       "name": "养羊",
       "help": ""
+    },
+    "WoolWorkerFilter": {
+      "name": "养羊使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     }
   },
   "IslandFishery": {
@@ -3483,6 +3556,10 @@
       "name": "小河虾底线",
       "help": ""
     },
+    "MinCrayfish": {
+      "name": "小龙虾底线",
+      "help": ""
+    },
     "MinCrab": {
       "name": "螃蟹底线",
       "help": ""
@@ -3496,7 +3573,7 @@
       "help": ""
     },
     "PlantYellowfinTuna": {
-      "name": "种黄鳍金枪鱼",
+      "name": "养黄鳍金枪鱼",
       "help": "",
       "0": "0",
       "1": "1",
@@ -3505,7 +3582,7 @@
     },
     "RancherFilter": {
       "name": "使用角色",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     }
   },
   "IslandMine": {
@@ -3529,6 +3606,10 @@
       "2": "2",
       "3": "3",
       "4": "4"
+    },
+    "WorkerFilter": {
+      "name": "矿山使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "MinCopper": {
       "name": "铜矿最低库存",
@@ -3573,6 +3654,10 @@
       "3": "3",
       "4": "4"
     },
+    "WorkerFilter": {
+      "name": "林场使用角色",
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
+    },
     "MinElegant": {
       "name": "优雅木材最低库存",
       "help": "仓库中优雅木材数量低于此值时，林场岗位才会生产"
@@ -3584,6 +3669,16 @@
     "MinSelected": {
       "name": "精选木材最低库存",
       "help": "仓库中精选木材数量低于此值时，林场岗位才会生产"
+    }
+  },
+  "IslandDailyGather": {
+    "_info": {
+      "name": "每日采集",
+      "help": "通过管理界面采集页签，UI模拟点击完成每日采集。执行时间：凌晨3:10、下午6:00。流程：选择采集目标→切换开关→分配角色→出发"
+    },
+    "WorkerFilter": {
+      "name": "采集角色",
+      "help": "以>连接，最多填写3个角色，分别对应第1~3个采集槽位。\n以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n每日采集不能选择 WorkerJuu，填写后会自动忽略。\n仅识别默认排序前两排；指定角色不可用时该槽位回退现有采集逻辑。"
     }
   },
   "IslandRestaurant": {
@@ -3599,11 +3694,11 @@
     },
     "ChefFilter": {
       "name": "厨师",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "DoubleBambooShoots": {
-      "name": "凉拌双笋",
-      "help": "在基础餐品之前优先制作（最高优先级）"
+      "name": "季节餐优先制作",
+      "help": "开启后按当前季节选择餐馆季节餐，并在基础餐品之前优先制作。春季为凉拌双笋，夏季为苋菜饭团；秋冬无餐馆季节餐时不额外制作。"
     },
     "Meal1": {
       "name": "餐品1",
@@ -3810,11 +3905,11 @@
     },
     "ChefFilter": {
       "name": "厨师",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "Seasonal": {
-      "name": "迎春花茶",
-      "help": "在常驻餐品之前检查并制作"
+      "name": "季节饮品优先制作",
+      "help": "开启后按当前季节选择白熊饮品的季节饮品，并在基础饮品之前优先制作。春季为迎春花茶，夏季为西瓜汁；秋冬无白熊饮品季节饮品时不额外制作。"
     },
     "Meal1": {
       "name": "餐品1",
@@ -4003,7 +4098,7 @@
     },
     "ChefFilter": {
       "name": "厨师",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "Meal1": {
       "name": "餐品1",
@@ -4014,6 +4109,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4030,6 +4126,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4046,6 +4143,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4062,6 +4160,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4078,6 +4177,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4094,6 +4194,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4110,6 +4211,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4126,6 +4228,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -4148,6 +4251,7 @@
       "carrot_omelette": "胡萝卜厚蛋烧",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     }
@@ -4165,7 +4269,7 @@
     },
     "ChefFilter": {
       "name": "厨师",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "Meal1": {
       "name": "餐品1",
@@ -4354,7 +4458,7 @@
     },
     "ChefFilter": {
       "name": "厨师",
-      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao"
+      "help": "以>连接，例如肇和 新泽西 小天城：ChaoHo > NewJersey > Amagi_chan\n小加加：Saratoga > 明石：Akashi > 塔什干：Tashkent > 应瑞：YingSwei\n恶毒：LeMalin > 独角兽：Unicorn > 岛风：Shimakaze > 柴郡：Cheshire\n镇海：ChenHai > 威廉D波特：WilliamDPorter\n海伦娜：Helena > 大帝：Friedrich > 愛宕：Atago\n逸仙：Yixian > 奥古斯特：August > 欧根亲王：Eugen > 胡德：Hood > 标枪：Javelin > 拉菲：Laffey > 探索者：Explorer > 领航员：Navigator > 领洋者：OceanCrosser > 飞云：FeiYun > 高雄：Takao\n仅识别默认排序前两排；指定舰娘不可用时回退 WorkerJuu。"
     },
     "Friedrich": {
       "name": "大帝",
@@ -4612,19 +4716,19 @@
   "IslandDailyInteract": {
     "_info": {
       "name": "每日/周任务",
-      "help": "控制岛屿每日与每周互动任务，包含晨露农场摸猫、开发计划中的 JUU 速运、商区外送服务和每周照相任务。"
+      "help": "仅支持minitouch。控制岛屿每日与每周互动任务，包含晨露农场摸猫、开发计划中的 JUU 速运、商区外送服务和每周照相任务。"
     },
     "WeeklyPhoto": {
       "name": "每周照相任务",
       "help": "从开发计划页面启动每周照相任务，循环完成三轮照相与空闲选择，直到任务图标消失。",
-      "True": "True",
-      "False": "False"
+      "True": "开启",
+      "False": "关闭"
     }
   },
   "IslandPearlSell": {
     "_info": {
       "name": "每周珍珠采购与售卖",
-      "help": "每周二 01:00 自动处理珍珠：先按最高采购价采购本周珍珠，再按最低售卖价售卖已有珍珠。其他未完成流程会延迟到次日 01:00 重试。仅支持minitouch。金币一定要够购买200x220个这是最低要求能一次买光本周珍珠, 否则可能会报错."
+      "help": "仅支持minitouch。每周二 01:00 自动处理珍珠：先按最高采购价采购本周珍珠，再按最低售卖价售卖已有珍珠。其他未完成流程会延迟到次日 01:00 重试。金币一定要够购买200x220个这是最低要求能一次买光本周珍珠, 否则可能会报错."
     },
     "BuyPrice": {
       "name": "最高采购价格",
@@ -5184,6 +5288,7 @@
       "roasted_skewer": "碳烤肉串",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -5194,6 +5299,7 @@
       "roasted_skewer": "碳烤肉串",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -5204,6 +5310,7 @@
       "roasted_skewer": "碳烤肉串",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -5214,6 +5321,7 @@
       "roasted_skewer": "碳烤肉串",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
@@ -5224,12 +5332,13 @@
       "roasted_skewer": "碳烤肉串",
       "stir_fried_chicken": "爆炒禽肉",
       "steak_bowl": "汉堡肉饭",
+      "crayfish_stir_fry": "爆炒小龙虾",
       "carnival": "烤肉狂欢",
       "double_energy": "能量双拼套餐"
     },
     "BoostReplaceFilter": {
       "name": "乌鱼烤肉加成替换过滤",
-      "help": "多个加成餐品时按过滤顺序优先替换第一个；替换槽位从餐品5→1倒查替换最后一个非空餐品\n可用餐品key对照：roasted_skewer:碳烤肉串, stir_fried_chicken:爆炒禽肉, steak_bowl:汉堡肉饭, carnival:烤肉狂欢, double_energy:能量双拼套餐\n示例：double_energy > carnival > 30 > steak_bowl > stir_fried_chicken > 20 > roasted_skewer > 10"
+      "help": "多个加成餐品时按过滤顺序优先替换第一个；替换槽位从餐品5→1倒查替换最后一个非空餐品\n可用餐品key对照：roasted_skewer:碳烤肉串, stir_fried_chicken:爆炒禽肉, steak_bowl:汉堡肉饭, crayfish_stir_fry:爆炒小龙虾, carnival:烤肉狂欢, double_energy:能量双拼套餐\n示例：double_energy > carnival > 30 > crayfish_stir_fry > steak_bowl > stir_fried_chicken > 20 > roasted_skewer > 10"
     }
   },
   "IslandBusinessShop5": {
@@ -5391,7 +5500,7 @@
       "name": "杀游戏跳过战斗",
       "help": "",
       "True": "已启用",
-      "False": "False"
+      "False": "关闭"
     }
   },
   "BoxDisassemble": {
@@ -5488,8 +5597,8 @@
     "EnableRemoteSSH": {
       "name": "启用远程 SSH 管理",
       "help": "在重启模拟器之前，通过 SSH 在远程服务器上执行特定指令（如重启 Docker 容器）。",
-      "True": "True",
-      "False": "False"
+      "True": "开启",
+      "False": "关闭"
     },
     "RemoteSSHHost": {
       "name": "远程服务器地址",
@@ -5508,12 +5617,12 @@
       "help": "SSH 登录所需的公钥内容（如果需要）"
     },
     "RemoteStartCommand": {
-      "name": "EmulatorManager.RemoteStartCommand.name",
-      "help": "EmulatorManager.RemoteStartCommand.help"
+      "name": "远程启动命令",
+      "help": "模拟器远程启动时执行的命令"
     },
     "RemoteStopCommand": {
-      "name": "EmulatorManager.RemoteStopCommand.name",
-      "help": "EmulatorManager.RemoteStopCommand.help"
+      "name": "远程关闭命令",
+      "help": "模拟器远程关闭时执行的命令"
     }
   },
   "OpsiSimulatorParameters": {
@@ -5601,8 +5710,8 @@
       "help": "存放任务内部状态，任务异常时可以手动清除"
     },
     "Storage": {
-      "name": "Storage.Storage.name",
-      "help": "Storage.Storage.help"
+      "name": "存储空间",
+      "help": "清除任务内部存储的状态数据"
     }
   },
   "Gui": {
@@ -5651,30 +5760,31 @@
       "Announcement": "公告",
       "Update": "更新器",
       "Remote": "远程控制",
+      "Setting": "设置",
       "Utils": "开发者工具"
     },
     "Overview": {
       "Scheduler": "调度器",
       "Dashboard": "仪表盘",
-      "SecondsAgo": "Gui.Overview.SecondsAgo",
-      "MinutesAgo": "Gui.Overview.MinutesAgo",
-      "HoursAgo": "Gui.Overview.HoursAgo",
-      "DaysAgo": "Gui.Overview.DaysAgo",
-      "MonthsAgo": "Gui.Overview.MonthsAgo",
-      "YearsAgo": "Gui.Overview.YearsAgo",
-      "NoData": "Gui.Overview.NoData",
-      "Oil": "Gui.Overview.Oil",
-      "Coin": "Gui.Overview.Coin",
-      "Gem": "Gui.Overview.Gem",
-      "Cube": "Gui.Overview.Cube",
-      "Pt": "Gui.Overview.Pt",
-      "YellowCoin": "Gui.Overview.YellowCoin",
-      "PurpleCoin": "Gui.Overview.PurpleCoin",
-      "ActionPoint": "Gui.Overview.ActionPoint",
-      "Merit": "Gui.Overview.Merit",
-      "Medal": "Gui.Overview.Medal",
-      "Core": "Gui.Overview.Core",
-      "GuildCoin": "Gui.Overview.GuildCoin",
+      "SecondsAgo": "秒前",
+      "MinutesAgo": "分钟前",
+      "HoursAgo": "小时前",
+      "DaysAgo": "天前",
+      "MonthsAgo": "月前",
+      "YearsAgo": "年前",
+      "NoData": "无数据",
+      "Oil": "石油",
+      "Coin": "物资",
+      "Gem": "钻石",
+      "Cube": "魔方",
+      "Pt": "活动PT",
+      "YellowCoin": "大世界黄币",
+      "PurpleCoin": "大世界紫币",
+      "ActionPoint": "行动力",
+      "Merit": "功勋",
+      "Medal": "勋章",
+      "Core": "核心数据",
+      "GuildCoin": "舰队币",
       "Log": "日志",
       "Running": "运行中",
       "Pending": "队列中",
@@ -5762,6 +5872,119 @@
       "EntryPoint": "远程访问 url 地址:",
       "ConfigureHint": "配置教程：",
       "SSHNotInstall": "系统中没有 ssh 工具，请参考教程下载或安装 ssh"
+    },
+    "Launcher": {
+      "StartupTitle": "启动器设置",
+      "AutoStart": "Windows 开机自启动",
+      "AutoStartHelp": "开启后，启动器会在登录 Windows 时自动启动，并默认最小化到托盘。",
+      "Loading": "正在读取启动器状态...",
+      "Connected": "启动器已连接",
+      "Disconnected": "启动器未连接，请通过启动器打开 AzurPilot",
+      "RemoteUnavailable": "开机自启动只能在本机 WebUI 中设置",
+      "Unsupported": "当前平台不支持开机自启动",
+      "Enabled": "已开启",
+      "Disabled": "已关闭",
+      "Setting": "正在设置...",
+      "Failed": "设置失败"
+    },
+    "DeploySetting": {
+      "Title": "部署设置",
+      "RestartNotice": "设置会立即写入 config/deploy.yaml，部分配置需要重启 AzurPilot 后生效。",
+      "Loading": "正在读取部署设置...",
+      "Refresh": "重新读取",
+      "Save": "保存设置",
+      "Saving": "正在保存...",
+      "Saved": "已保存到 config/deploy.yaml，部分配置将在下次启动后生效。",
+      "Failed": "操作失败",
+      "Enabled": "启用",
+      "Disabled": "禁用",
+      "DemoDisabled": "演示模式下不能修改部署设置。",
+      "GroupGit": "Git 配置",
+      "GroupPython": "Python 配置",
+      "GroupAdb": "ADB 配置",
+      "GroupOcr": "OCR 配置",
+      "GroupUpdate": "更新配置",
+      "GroupMisc": "其他配置",
+      "GroupRemoteAccess": "远程访问",
+      "GroupWebui": "WebUI 配置",
+      "Repository": "AzurPilot 仓库地址",
+      "RepositoryHelp": "用于更新和安装的 Git 仓库地址。国内用户可使用 git://git.pull/AzurPilot。",
+      "Branch": "分支",
+      "BranchHelp": "稳定版通常使用 master，开发或测试可填写 dev、app 等分支。",
+      "GitExecutable": "Git 可执行文件",
+      "GitExecutableHelp": "git.exe 路径，通常保持默认即可。",
+      "GitProxy": "Git 代理",
+      "GitProxyHelp": "HTTP 或 SOCKS5 代理地址，留空表示不使用代理。",
+      "SSLVerify": "Git SSL 验证",
+      "SSLVerifyHelp": "连接可信网络时建议开启。",
+      "AutoUpdate": "启动时自动更新",
+      "AutoUpdateHelp": "启动 AzurPilot 时自动检查并更新代码。",
+      "PythonExecutable": "Python 可执行文件",
+      "PythonExecutableHelp": "用于运行 AzurPilot 的 Python 路径。",
+      "PypiMirror": "PyPI 镜像",
+      "PypiMirrorHelp": "安装依赖使用的镜像地址，留空使用默认源。",
+      "InstallDependencies": "启动时安装依赖",
+      "InstallDependenciesHelp": "启动时自动检查并安装 Python 依赖。",
+      "AdbExecutable": "ADB 可执行文件",
+      "AdbExecutableHelp": "adb.exe 路径。",
+      "ReplaceAdb": "替换模拟器 ADB",
+      "ReplaceAdbHelp": "兼容国产模拟器时建议开启。",
+      "AutoConnect": "自动连接模拟器",
+      "AutoConnectHelp": "启动时尝试连接可用模拟器实例。",
+      "InstallUiautomator2": "重装 uiautomator2",
+      "InstallUiautomator2Help": "启动时检查并重新安装 uiautomator2。",
+      "UseOcrServer": "使用 OCR 服务器",
+      "UseOcrServerHelp": "让实例连接独立 OCR 服务以减少内存占用。",
+      "StartOcrServer": "启动 GUI 时启动 OCR 服务器",
+      "StartOcrServerHelp": "启动 WebUI 时同时启动 OCR 服务进程。",
+      "OcrServerPort": "OCR 服务器端口",
+      "OcrServerPortHelp": "WebUI 启动的 OCR 服务监听端口。",
+      "OcrClientAddress": "OCR 客户端地址",
+      "OcrClientAddressHelp": "实例连接 OCR 服务时使用的地址。",
+      "EnableReload": "启用内置更新和重载",
+      "EnableReloadHelp": "允许 WebUI 使用内置更新和自动重启能力。",
+      "CheckUpdateInterval": "检查更新间隔",
+      "CheckUpdateIntervalHelp": "每隔多少分钟检查一次更新，0 表示禁用。",
+      "AutoRestartTime": "定时重启时间",
+      "AutoRestartTimeHelp": "有更新时每天自动重启的时间，留空表示禁用。",
+      "DiscordRichPresence": "Discord 富状态",
+      "DiscordRichPresenceHelp": "在 Discord 中展示 AzurPilot 运行状态。",
+      "EnableRemoteAccess": "启用远程访问",
+      "EnableRemoteAccessHelp": "通过 SSH 反向隧道暴露 WebUI。公网使用前请务必设置密码。",
+      "SSHUser": "SSH 用户",
+      "SSHUserHelp": "远程访问服务登录用户名，留空时启动时生成。",
+      "SSHServer": "SSH 服务器",
+      "SSHServerHelp": "远程访问连接的服务器，格式为 host:port。",
+      "SSHExecutable": "SSH 可执行文件",
+      "SSHExecutableHelp": "ssh.exe 路径，留空或使用 ssh 表示从 PATH 查找。",
+      "WebuiHost": "WebUI 监听地址",
+      "WebuiHostHelp": "WebUI 监听的主机地址，例如 0.0.0.0、127.0.0.1 或 ::。",
+      "WebuiPort": "WebUI 端口",
+      "WebuiPortHelp": "WebUI 监听端口。",
+      "Language": "WebUI 语言",
+      "LanguageHelp": "WebUI 使用的显示语言。",
+      "Theme": "WebUI 主题",
+      "ThemeHelp": "WebUI 使用的视觉主题。",
+      "DpiScaling": "跟随系统 DPI 缩放",
+      "DpiScalingHelp": "跟随系统 DPI 缩放界面尺寸。",
+      "Password": "WebUI 密码",
+      "PasswordHelp": "访问 WebUI 使用的密码。留空表示不设置密码。",
+      "CDN": "PyWebIO CDN",
+      "CDNHelp": "可填写 true、false 或自定义 CDN 地址。",
+      "WebuiSSLKey": "SSL 密钥文件",
+      "WebuiSSLKeyHelp": "WebUI HTTPS 使用的 SSL 密钥路径，需和证书同时设置。",
+      "WebuiSSLCert": "SSL 证书文件",
+      "WebuiSSLCertHelp": "WebUI HTTPS 使用的 SSL 证书路径，需和密钥同时设置。"
+    },
+    "StartupRun": {
+      "Title": "启动时自动运行",
+      "Description": "开启后，WebUI 或启动器启动 AzurPilot 时会自动运行当前实例；只影响下次启动。",
+      "Loading": "正在读取启动策略...",
+      "Enabled": "已加入启动时自动运行列表",
+      "Disabled": "未加入启动时自动运行列表",
+      "Setting": "正在写入 deploy.yaml...",
+      "Failed": "设置失败",
+      "Unavailable": "当前无法读取启动时自动运行设置"
     },
     "Text": {
       "InvalidFeedBack": "格式错误。 示例：{0}",
@@ -5887,18 +6110,20 @@
       "NoValidResourceData": "暂无有效资源数据"
     },
     "Tactical": {
-      "SkillAutoSwitch": "Gui.Tactical.SkillAutoSwitch"
+      "SkillAutoSwitch": "技能自动切换"
     },
     "OpsiScheduling": {
-      "UseSmartSchedulingOperationCoinsPreserve": "Gui.OpsiScheduling.UseSmartSchedulingOperationCoinsPreserve",
-      "OperationCoinsPreserve": "Gui.OpsiScheduling.OperationCoinsPreserve",
-      "ActionPointPreserve": "Gui.OpsiScheduling.ActionPointPreserve",
-      "OperationCoinsReturnThreshold": "Gui.OpsiScheduling.OperationCoinsReturnThreshold",
-      "EnableMeowfficerFarming": "Gui.OpsiScheduling.EnableMeowfficerFarming",
-      "EnableObscure": "Gui.OpsiScheduling.EnableObscure",
-      "EnableAbyssal": "Gui.OpsiScheduling.EnableAbyssal",
-      "EnableStronghold": "Gui.OpsiScheduling.EnableStronghold",
-      "MeowStartEarlyMode": "Gui.OpsiScheduling.MeowStartEarlyMode"
+      "UseSmartSchedulingOperationCoinsPreserve": "智能调度作战补给凭证保留",
+      "OperationCoinsPreserve": "作战补给凭证保留",
+      "ActionPointPreserve": "行动力保留",
+      "ActionPointEarlyTriggerEnable": "行动力提前调度",
+      "ActionPointEarlyTriggerThreshold": "提前调度行动力阈值",
+      "OperationCoinsReturnThreshold": "作战补给凭证回退阈值",
+      "EnableMeowfficerFarming": "启用指挥喵刷取",
+      "EnableObscure": "启用隐秘海域",
+      "EnableAbyssal": "启用深渊海域",
+      "EnableStronghold": "启用塞壬要塞",
+      "MeowStartEarlyMode": "短猫提前开始模式"
     },
     "Misc": {
       "Enabled": "已开启",

@@ -8,6 +8,7 @@ SSH 进程的标准输出包含连接信息。
 """
 
 import json
+import os
 import shlex
 import threading
 import time
@@ -39,7 +40,7 @@ def am_i_the_only_thread() -> bool:
 
 def remote_access_service(
     local_host="127.0.0.1",
-    local_port=22267,
+    local_port=25548,
     server="app.pywebio.online",
     server_port=1022,
     remote_port="/",
@@ -53,7 +54,7 @@ def remote_access_service(
 
     Args:
         local_host: 本地监听地址，默认 127.0.0.1。
-        local_port: 本地监听端口，默认 22267。
+        local_port: 本地监听端口，默认 25548。
         server: SSH 服务器域名。
         server_port: SSH 服务器端口。
         remote_port: 远程端口，默认 '/'（由服务端分配）。
@@ -62,7 +63,15 @@ def remote_access_service(
     global _ssh_process, _ssh_notfound
 
     bin = State.deploy_config.SSHExecutable
-    cmd = f"{bin} -oStrictHostKeyChecking=no -R {remote_port}:{local_host}:{local_port} -p {server_port} {server} -- --output json"
+    known_hosts = os.devnull
+    cmd = (
+        f"{bin} -oStrictHostKeyChecking=no "
+        f"-oUserKnownHostsFile={known_hosts} "
+        f"-oGlobalKnownHostsFile={known_hosts} "
+        f"-oLogLevel=ERROR "
+        f"-R {remote_port}:{local_host}:{local_port} "
+        f"-p {server_port} {server} -- --output json"
+    )
     args = shlex.split(cmd)
     logger.debug(f"remote access service command: {cmd}")
 

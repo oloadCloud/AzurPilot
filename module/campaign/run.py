@@ -244,6 +244,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
             'event_20250814_cn',
             'event_20251023_cn',
             'event_20260326_cn',
+            'event_20260625_cn',
             'war_archives_20230525_cn',
             'war_archives_20231026_cn',
             'war_archives_20240725_cn',
@@ -282,6 +283,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
             'event_20250814_cn',
             'event_20251023_cn',
             'event_20260326_cn',
+            'event_20260625_cn',
             'war_archives_20230525_cn',
             'war_archives_20231026_cn',
             'war_archives_20240725_cn',
@@ -370,6 +372,10 @@ class CampaignRun(CampaignEvent, ShopStatus):
             return False
 
         return self.run_count > 0 and self.campaign.map_is_auto_search
+
+    def after_campaign_run(self):
+        """单次战役完成后的扩展钩子。"""
+        pass
 
     def handle_commission_notice(self):
         """
@@ -466,6 +472,9 @@ class CampaignRun(CampaignEvent, ShopStatus):
             except ScriptEnd as e:
                 logger.hr('Script end')
                 logger.info(str(e))
+                # 撤退后关闭任务：禁用当前任务，调度器将运行后续任务
+                if str(e) == 'DefeatWithdraw=withdraw_stop':
+                    self.config.Scheduler_Enable = False
                 break
 
             # 更新配置
@@ -476,6 +485,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
             self.run_count += 1
             if self.config.StopCondition_RunCount:
                 self.config.StopCondition_RunCount -= 1
+            self.after_campaign_run()
             # 结束条件
             if self.triggered_stop_condition(oil_check=False):
                 break

@@ -348,11 +348,11 @@
     },
     "IslandDailyInteract": {
       "name": "デイリー/週間任務",
-      "help": "島のふれあい、JUU速達、商区外送サービス、週間写真タスクを処理します。関連ボタンリソース生成後に有効化できます。"
+      "help": "minitouchのみ対応。島のふれあい、JUU速達、商区外送サービス、週間写真タスクを処理します。関連ボタンリソース生成後に有効化できます。"
     },
     "IslandPearlSell": {
       "name": "週間パール取引",
-      "help": "毎週火曜日01:00にパールを自動処理：まず今週のパールを購入し、次に既存のパールを販売します。minitouchのみ対応。コインが200x220個分の購入に十分であることを確認してください。これが今週のパールを一括購入するための最低要件です。不足するとエラーが発生する可能性があります。"
+      "help": "minitouchのみ対応。毎週火曜日01:00にパールを自動処理：まず今週のパールを購入し、次に既存のパールを販売します。コインが200x220個分の購入に十分であることを確認してください。これが今週のパールを一括購入するための最低要件です。不足するとエラーが発生する可能性があります。"
     },
     "Daemon": {
       "name": "半自動クリック",
@@ -400,7 +400,7 @@
       "name": "この機能を有効にする",
       "help": "このタスクをスケジューラに追加します\n委託、科研、収穫タスクは強制的にオンになっています",
       "True": "有効",
-      "False": "False"
+      "False": "無効"
     },
     "PushNotification": {
       "name": "プッシュ通知",
@@ -431,8 +431,24 @@
     "Sensitive": {
       "name": "センシティブ任務",
       "help": "エラー発生時にゲームの再起動を禁止し、AzurPilot を直ちに停止します。越境デイリー、隠秘海域、深淵海域などの重要なタスクに適用。",
-      "True": "True",
-      "False": "False"
+      "True": "はい",
+      "False": "いいえ"
+    }
+  },
+  "Restart": {
+    "_info": {
+      "name": "再起動設定",
+      "help": ""
+    },
+    "RandomDelay": {
+      "name": "毎日の再起動ランダム遅延",
+      "help": "毎日ゲームクライアントを再起動するとき、サーバー更新時刻からランダムに X 分遅らせて実行し、複数クライアントのログインを分散します。\n単一の数値または範囲を指定できます。例: 5, 50。0 にすると無効になります。"
+    },
+    "ClearCache": {
+      "name": "再起動時にキャッシュをクリア",
+      "help": "ゲームクライアント再起動時、アプリを強制停止した後に /sdcard/Android/data/<パッケージ>/cache/ 配下の外部キャッシュファイルを削除します。",
+      "True": "オン",
+      "False": "オフ"
     }
   },
   "Emulator": {
@@ -1072,6 +1088,7 @@
       "event_20260326_cn": "ワンダラー募集計画",
       "event_20260417_cn": "バケーションレーン・きらめく砂浜",
       "event_20260520_cn": "聖印前の同盟",
+      "event_20260625_cn": "幻夢のカヴァルカード",
       "raid_20200624": "特別演習超空強襲波（復刻）",
       "raid_20210708": "交錯する新たな波 (復刻)",
       "raid_20220127": "秘密事件調査",
@@ -1167,8 +1184,11 @@
       "help": "ゲーム内蔵の推奨編成を使用してハードステージの編成を自動的に完了します"
     },
     "DefeatWithdraw": {
-      "name": "道中での戦闘で敗北し撤退",
-      "help": "道中戦闘で敗北した際の処理方法。オンの場合は海域から直接退出し、オフの場合は別のチームが引き継いで後続の戦闘を試みる。"
+      "name": "道中敗北時の処理",
+      "help": "道中戦闘で敗北した際の処理方法",
+      "withdraw_continue": "撤退して任務続行",
+      "switch_fleet": "艦隊切替して続行",
+      "withdraw_stop": "撤退して任務終了"
     }
   },
   "StopCondition": {
@@ -1209,6 +1229,28 @@
     "ReachLevel": {
       "name": "艦船がレベルXに達すると停止します",
       "help": "レベルX未満の艦船がレベルXに達すると停止します。\n0はレベル制限なしを意味します"
+    }
+  },
+  "WarArchives": {
+    "_info": {
+      "name": "作戦アーカイブ",
+      "help": ""
+    },
+    "DailyRunCount": {
+      "name": "デイリー出撃回数",
+      "help": "作戦アーカイブを1日に実行する最大回数です。\n0は無制限です。\n上限に達すると、タスクを無効化せず次回サーバー更新まで延期します。"
+    },
+    "DailyRunCountRemain": {
+      "name": "本日の残り出撃回数",
+      "help": "スクリプトが自動管理する本日の残り回数です。"
+    },
+    "DailyRunCountRecord": {
+      "name": "デイリー出撃回数記録時刻",
+      "help": "サーバー更新後のリセットに使う、スクリプトが自動管理する記録時刻です。"
+    },
+    "DailyRunCountLimit": {
+      "name": "前回のデイリー出撃回数",
+      "help": "回数調整に使う、スクリプトが自動管理する前回の設定値です。"
     }
   },
   "Fleet": {
@@ -1715,7 +1757,7 @@
       "help": "",
       "easy": "正午",
       "normal": "黄昏",
-      "hard": "夜晚"
+      "hard": "夜"
     },
     "Stage": {
       "name": "ステージ名",
@@ -1833,8 +1875,8 @@
     "SkillAutoSwitch": {
       "name": "自動スキル切替",
       "help": "次の未学習スキルに自動的に切り替えて学習します",
-      "True": "オン",
-      "False": "オフ"
+      "True": "有効",
+      "False": "無効"
     }
   },
   "ControlExpOverflow": {
@@ -1873,7 +1915,7 @@
       "help": ""
     },
     "Favorite": {
-      "name": "常用を優先する",
+      "name": "お気に入りのみ選択",
       "help": ""
     },
     "MinLevel": {
@@ -2454,10 +2496,10 @@
       "name": "カードプール",
       "help": "",
       "light": "ライトプール",
-      "heavy": "頑丈なプール",
+      "heavy": "ヘビープール",
       "special": "特別なプール",
       "event": "イベントプール",
-      "wishing_well": "祈りのプール"
+      "wishing_well": "願いのプール"
     },
     "Amount": {
       "name": "引いたカードの枚数",
@@ -2484,26 +2526,26 @@
   },
   "BattlePass": {
     "_info": {
-      "name": "大きな月のカード",
+      "name": "マンスリーパス",
       "help": ""
     },
     "Collect": {
-      "name": "ビッグマンスカードの特典を受け取る",
+      "name": "マンスリーパスの特典を受け取る",
       "help": ""
     }
   },
   "DataKey": {
     "_info": {
-      "name": "ファイルキー",
+      "name": "データキー",
       "help": ""
     },
     "Collect": {
-      "name": "ファイルキーを取得する",
+      "name": "データキーを取得する",
       "help": ""
     },
     "ForceCollect": {
-      "name": "ファイルキーの強制収集",
-      "help": "ファイルキーがいっぱいの場合、それを収集することが必須になります（赤い点を削除します）"
+      "name": "データキーの強制収集",
+      "help": "データキーがいっぱいの場合、それを収集することが必須になります（赤い点を削除します）"
     }
   },
   "Mail": {
@@ -2584,7 +2626,8 @@
       "sirius": "シリウス",
       "new_jersey": "ニュージャージー",
       "taihou": "大鳳",
-      "aegir": "エーギル"
+      "aegir": "エーギル",
+      "nakhimov": "nakhimov"
     }
   },
   "Daily": {
@@ -3092,6 +3135,10 @@
       "name": "行動力をXポイント保留",
       "help": "行動力がX以下になると停止し、行動力ボックスを自動で開きます。\nこの値はセイレーン作戦リセット3日前に自動的に200ポイントに減ります。侵食1レベリングが有効な場合は1000ポイントに変更され、最終日には自動的に0ポイントに減ります。"
     },
+    "SmartNaturalAPCleanup": {
+      "name": "スマートスケジュール自然行動力消化",
+      "help": "スマートスケジュールが自然回復した行動力を消化するために短猫を起動するときに使う一時的な非表示フラグ。"
+    },
     "HazardLevel": {
       "name": "侵食レベル",
       "help": "指定した侵食レベルの海域を時計回りに攻撃します。\n指揮ニャポイント/行動力の比率が高い5または3を選択するのがおすすめです。",
@@ -3160,8 +3207,8 @@
     "SkipHpCheck": {
       "name": "HPチェックをスキップ",
       "help": "戦闘後のHPチェックをスキップします。艦船が撃沈されても練級を続行します。",
-      "True": "True",
-      "False": "False"
+      "True": "有効",
+      "False": "無効"
     },
     "Cl1Filter": {
       "name": "明石購入フィルター",
@@ -3227,8 +3274,8 @@
     "EnableCustomCheck": {
       "name": "カスタム艦船検出を有効にする",
       "help": "有効にすると、指定した艦船のみが目標レベルに達したかを検出します。",
-      "True": "True",
-      "False": "False"
+      "True": "有効",
+      "False": "無効"
     },
     "CustomCheckPositions": {
       "name": "カスタム検出艦位",
@@ -3241,14 +3288,14 @@
   },
   "OpsiFleetAutoChange": {
     "_info": {
-      "name": "OpsiFleetAutoChange._info.name",
-      "help": "OpsiFleetAutoChange._info.help"
+      "name": "艦隊自動変更",
+      "help": "大洋で艦隊の自動変更を設定します"
     },
     "Enable": {
       "name": "自動編成を有効にする",
       "help": "有効にすると、経験値が最大になった艦船を自動的に交換します。",
-      "True": "True",
-      "False": "False"
+      "True": "有効",
+      "False": "無効"
     },
     "CooldownHours": {
       "name": "クールダウン時間（時間）",
@@ -3271,8 +3318,8 @@
     "UseSmartSchedulingOperationCoinsPreserve": {
       "name": "X 個の戦闘物資引換券を入手する",
       "help": "有効にすると、以下に設定された戦闘補給券をX個入手する構成が使用されます。無効にすると、侵食 1 レベリングと黄色のコイン保持構成が使用されます。\n閉じたときにモビリティ制御が使用されます\n開いた後、黄色のコインを使用して制御します",
-      "True": "真実",
-      "False": "間違い"
+      "True": "有効",
+      "False": "無効"
     },
     "OperationCoinsPreserve": {
       "name": "侵食 1 レベリング、X 戦闘供給券を維持",
@@ -3282,6 +3329,16 @@
       "name": "ショートキャットは X ポイントの可動性を接続して保持します",
       "help": "モビリティがX以下になると停止し、モビリティボックスが自動的に開きます。"
     },
+    "ActionPointEarlyTriggerEnable": {
+      "name": "行動力の早期スケジュール",
+      "help": "侵食 1 または指揮ニャ周回の終了時に自然回復分の行動力を記録し、10 分ごとに 1 回復する速度でスマートスケジュールの次回実行時刻を計算して、行動力あふれを防ぎます。",
+      "True": "有効",
+      "False": "無効"
+    },
+    "ActionPointEarlyTriggerThreshold": {
+      "name": "早期スケジュール行動力しきい値",
+      "help": "自然回復分の行動力が X まで回復したらスマートスケジュールを再実行します。既定値は 200 で、自然上限付近で侵食 1 または指揮ニャ周回を選び直す用途に向いています。"
+    },
     "OperationCoinsReturnThreshold": {
       "name": "X 個の戦闘物資引換券を入手する",
       "help": "黄色のコイン獲得ミッション中に、戦闘補給券を合計 X 枚獲得 (増加) し、レベルを上げるために侵食 1 に戻ります。"
@@ -3290,25 +3347,25 @@
       "name": "ショートキャット接続を有効にする",
       "help": "インテリジェント スケジューリングでショート キャット接続タスクが黄色のコインを補充できるようにするかどうか",
       "True": "有効",
-      "False": "有効になっていません"
+      "False": "無効"
     },
     "EnableObscure": {
       "name": "未知の海を可能にする",
       "help": "黄色のコインを補充するためにインテリジェントなスケジューリングでHidden Seaミッションを有効にするかどうか",
       "True": "有効",
-      "False": "有効になっていません"
+      "False": "無効"
     },
     "EnableAbyssal": {
       "name": "深海を有効にする",
       "help": "イエローコインを補充するためのインテリジェントなスケジューリングで深海ミッションを有効にするかどうか",
       "True": "有効",
-      "False": "有効になっていません"
+      "False": "無効"
     },
     "EnableStronghold": {
       "name": "セイレン要塞を有効にする",
       "help": "黄色のコインを補充するためにインテリジェント スケジューリングで Siren Fortress タスクを有効にするかどうか",
       "True": "有効",
-      "False": "有効になっていません"
+      "False": "無効"
     },
     "MeowStartEarlyMode": {
       "name": "月末モビリティ自動掃除モード",
@@ -3353,6 +3410,10 @@
       "3": "3",
       "4": "4"
     },
+    "WorkerFilter": {
+      "name": "農場作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
+    },
     "MinFarm": {
       "name": "作物在庫閾値",
       "help": "660以上を推奨"
@@ -3379,6 +3440,10 @@
       "2": "2",
       "3": "3",
       "4": "4"
+    },
+    "WorkerFilter": {
+      "name": "果樹園作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "MinOrchard": {
       "name": "果物在庫閾値",
@@ -3412,6 +3477,10 @@
       "help": "",
       "1": "1",
       "2": "2"
+    },
+    "WorkerFilter": {
+      "name": "苗床作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "MinNursery": {
       "name": "苗床作物在庫閾値",
@@ -3448,11 +3517,15 @@
     },
     "RancherFilter": {
       "name": "キャラクターフィルター",
-      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "Wool": {
       "name": "羊を飼育",
       "help": ""
+    },
+    "WoolWorkerFilter": {
+      "name": "羊作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     }
   },
   "IslandFishery": {
@@ -3483,6 +3556,10 @@
       "name": "エビ在庫閾値",
       "help": ""
     },
+    "MinCrayfish": {
+      "name": "ザリガニ在庫閾値",
+      "help": ""
+    },
     "MinCrab": {
       "name": "カニ在庫閾値",
       "help": ""
@@ -3505,7 +3582,7 @@
     },
     "RancherFilter": {
       "name": "キャラクターフィルター",
-      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     }
   },
   "IslandMine": {
@@ -3522,13 +3599,17 @@
       "4": "4"
     },
     "MineSilver": {
-      "name": "采银矿岗位数",
+      "name": "銀鉱山の作業人数",
       "help": "アイドル鉱山ポストのいくつかを銀の生産に割り当て、残りは空きのままにします。",
       "0": "0",
       "1": "1",
       "2": "2",
       "3": "3",
       "4": "4"
+    },
+    "WorkerFilter": {
+      "name": "鉱山作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "MinCopper": {
       "name": "銅鉱石最低在庫",
@@ -3565,13 +3646,17 @@
       "4": "4"
     },
     "CutElegant": {
-      "name": "伐典雅之木岗位数",
+      "name": "エレガント伐採の作業人数",
       "help": "アイドル林業ポストのいくつかを高級木材の生産に割り当て、残りは空きのままにします。",
       "0": "0",
       "1": "1",
       "2": "2",
       "3": "3",
       "4": "4"
+    },
+    "WorkerFilter": {
+      "name": "林場作業員フィルター",
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "MinElegant": {
       "name": "エレガント木材最低在庫",
@@ -3584,6 +3669,16 @@
     "MinSelected": {
       "name": "セレクテッド木材最低在庫",
       "help": "倉庫のセレクテッド木材がこの値を下回った場合のみ林場ポジションが生産します。"
+    }
+  },
+  "IslandDailyGather": {
+    "_info": {
+      "name": "デイリー採集",
+      "help": "管理画面の採集タブからデイリー採集を実行します。実行時刻：03:10、18:00。流れ：採集対象を選択→スイッチを切替→キャラクターを配置→出発。"
+    },
+    "WorkerFilter": {
+      "name": "採集キャラクターフィルター",
+      "help": ">で接続。最大3人まで指定でき、採集スロット1～3に対応します。\n>で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデイリー採集では WorkerJuu を選択できません。入力されている場合は自動で無視します。\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合、そのスロットは既存の採集ロジックにフォールバックします。"
     }
   },
   "IslandRestaurant": {
@@ -3599,11 +3694,11 @@
     },
     "ChefFilter": {
       "name": "シェフフィルター",
-      "help": ">で接続"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "DoubleBambooShoots": {
-      "name": "涼拌双筍",
-      "help": "基本メニューの前に最優先で生産されます。"
+      "name": "季節料理を優先生産",
+      "help": "有効にすると、現在の季節のレストラン季節料理を基本メニューより先に生産します。春は涼拌双筍、夏はアマランサスおにぎりです。秋冬は追加の季節料理を生産しません。"
     },
     "Meal1": {
       "name": "メニュー1",
@@ -3810,11 +3905,11 @@
     },
     "ChefFilter": {
       "name": "シェフフィルター",
-      "help": ">で接続"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "Seasonal": {
-      "name": "春花茶",
-      "help": "常設メニューの前にチェックして生産されます。"
+      "name": "季節ドリンクを優先生産",
+      "help": "有効にすると、現在の季節の白熊ドリンク季節品を基本ドリンクより先に生産します。春は迎春花茶、夏はスイカジュースです。秋冬は追加の季節ドリンクを生産しません。"
     },
     "Meal1": {
       "name": "メニュー1",
@@ -4003,7 +4098,7 @@
     },
     "ChefFilter": {
       "name": "シェフフィルター",
-      "help": ">で接続"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "Meal1": {
       "name": "メニュー1",
@@ -4014,6 +4109,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4030,6 +4126,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4046,6 +4143,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4062,6 +4160,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4078,6 +4177,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4094,6 +4194,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4110,6 +4211,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4126,6 +4228,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -4148,6 +4251,7 @@
       "carrot_omelette": "にんじん厚焼き玉子",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     }
@@ -4165,7 +4269,7 @@
     },
     "ChefFilter": {
       "name": "シェフフィルター",
-      "help": ">で接続"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "Meal1": {
       "name": "メニュー1",
@@ -4354,7 +4458,7 @@
     },
     "ChefFilter": {
       "name": "シェフフィルター",
-      "help": ">で接続"
+      "help": ">で接続。例：ChaoHo > NewJersey > Amagi_chan\nSaratoga > Akashi > Tashkent > YingSwei\nLeMalin > Unicorn > Shimakaze > Cheshire\nChenHai > WilliamDPorter\nHelena > Friedrich > Atago\nYixian > August > Eugen > Hood > Javelin > Laffey > Explorer > Navigator > OceanCrosser > FeiYun > Takao\nデフォルト順の先頭2行のみ認識します。指定キャラクターが使用できない場合は WorkerJuu にフォールバックします。"
     },
     "Friedrich": {
       "name": "フリードリヒ",
@@ -4612,19 +4716,19 @@
   "IslandDailyInteract": {
     "_info": {
       "name": "デイリー/週間任務",
-      "help": "朝露農場のふれあい、開発計画の JUU 速達、商区外送サービス、週間写真タスクを含む島のデイリー・週間交流を制御します。"
+      "help": "minitouchのみ対応。朝露農場のふれあい、開発計画の JUU 速達、商区外送サービス、週間写真タスクを含む島のデイリー・週間交流を制御します。"
     },
     "WeeklyPhoto": {
       "name": "週間写真タスク",
       "help": "開発計画から週間写真タスクを開始し、写真撮影と待機選択を3回繰り返し、タスクアイコンが消えるまで処理します。",
-      "True": "True",
-      "False": "False"
+      "True": "有効",
+      "False": "無効"
     }
   },
   "IslandPearlSell": {
     "_info": {
       "name": "週間パール取引",
-      "help": "毎週火曜日01:00にパールを自動処理：まず最高購入価格で今週のパールを購入し、次に最低販売価格で既存のパールを販売します。他の未完了プロセスは翌日01:00にリトライされます。minitouchのみ対応。コインが200x220個分の購入に十分であることを確認してください。これが今週のパールを一括購入するための最低要件です。不足するとエラーが発生する可能性があります。"
+      "help": "minitouchのみ対応。毎週火曜日01:00にパールを自動処理：まず最高購入価格で今週のパールを購入し、次に最低販売価格で既存のパールを販売します。他の未完了プロセスは翌日01:00にリトライされます。コインが200x220個分の購入に十分であることを確認してください。これが今週のパールを一括購入するための最低要件です。不足するとエラーが発生する可能性があります。"
     },
     "BuyPrice": {
       "name": "最大購入価格",
@@ -5184,6 +5288,7 @@
       "roasted_skewer": "炭焼き串",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -5194,6 +5299,7 @@
       "roasted_skewer": "炭焼き串",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -5204,6 +5310,7 @@
       "roasted_skewer": "炭焼き串",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -5214,6 +5321,7 @@
       "roasted_skewer": "炭焼き串",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -5224,6 +5332,7 @@
       "roasted_skewer": "炭焼き串",
       "stir_fried_chicken": "鶏肉炒め",
       "steak_bowl": "ハンバーグ丼",
+      "crayfish_stir_fry": "ザリガニ炒め",
       "carnival": "バーベキュー祭り",
       "double_energy": "エネルギーダブルセット"
     },
@@ -5391,7 +5500,7 @@
       "name": "ゲームをキルし、戦闘をスキップする",
       "help": "",
       "True": "有効",
-      "False": "間違い"
+      "False": "無効"
     }
   },
   "BoxDisassemble": {
@@ -5488,8 +5597,8 @@
     "EnableRemoteSSH": {
       "name": "リモートSSH管理を有効にする",
       "help": "エミュレータを再起動する前に、SSH経由でリモートサーバー上で特定のコマンドを実行します。",
-      "True": "True",
-      "False": "False"
+      "True": "有効",
+      "False": "無効"
     },
     "RemoteSSHHost": {
       "name": "リモートサーバーアドレス",
@@ -5601,8 +5710,8 @@
       "help": "タスクの内部状態を保存します。タスクが異常な場合は手動でクリアできます。"
     },
     "Storage": {
-      "name": "ストレージ.ストレージ.名",
-      "help": "ストレージ.ストレージ.ヘルプ"
+      "name": "タスクストレージ",
+      "help": "タスク内部の状態データをクリアします"
     }
   },
   "Gui": {
@@ -5651,30 +5760,31 @@
       "Announcement": "発表",
       "Update": "アップデーター",
       "Remote": "リモコン",
+      "Setting": "設定",
       "Utils": "道具"
     },
     "Overview": {
       "Scheduler": "スケジューラ",
       "Dashboard": "ダッシュボード",
-      "SecondsAgo": "Gui.概要.秒前",
-      "MinutesAgo": "Gui.概要.数分前",
-      "HoursAgo": "Gui.概要.時間前",
-      "DaysAgo": "Gui.概要.日前",
-      "MonthsAgo": "Gui.概要.数か月前",
-      "YearsAgo": "Gui.概要.年前",
-      "NoData": "Gui.Overview.NoData",
-      "Oil": "Gui.概要.オイル",
-      "Coin": "Gui.概要.コイン",
-      "Gem": "Gui.概要.Gem",
-      "Cube": "Gui.概要.Cube",
-      "Pt": "Gui.概要.Pt",
-      "YellowCoin": "Gui.概要.YellowCoin",
-      "PurpleCoin": "Gui.概要.パープルコイン",
-      "ActionPoint": "Gui.Overview.ActionPoint",
-      "Merit": "GUI.概要.メリット",
-      "Medal": "GUI.概要.メダル",
-      "Core": "Gui.概要.コア",
-      "GuildCoin": "Gui.概要.ギルドコイン",
+      "SecondsAgo": "秒前",
+      "MinutesAgo": "分前",
+      "HoursAgo": "時間前",
+      "DaysAgo": "日前",
+      "MonthsAgo": "ヶ月前",
+      "YearsAgo": "年前",
+      "NoData": "データなし",
+      "Oil": "燃料",
+      "Coin": "資金",
+      "Gem": "ダイヤ",
+      "Cube": "キューブ",
+      "Pt": "イベントPT",
+      "YellowCoin": "大洋黄貨",
+      "PurpleCoin": "大洋紫貨",
+      "ActionPoint": "行動力",
+      "Merit": "功績",
+      "Medal": "メダル",
+      "Core": "コアデータ",
+      "GuildCoin": "艦隊貨幣",
       "Log": "ログ",
       "Running": "ランニング",
       "Pending": "キューにいます",
@@ -5763,6 +5873,119 @@
       "ConfigureHint": "構成チュートリアル:",
       "SSHNotInstall": "システムに ssh ツールがありません。チュートリアルを参照して ssh をダウンロードまたはインストールしてください。"
     },
+    "Launcher": {
+      "StartupTitle": "ランチャー設定",
+      "AutoStart": "Windows 起動時に自動起動",
+      "AutoStartHelp": "有効にすると、Windows サインイン後にランチャーが自動起動し、既定でトレイに最小化されます。",
+      "Loading": "ランチャー状態を読み込み中...",
+      "Connected": "ランチャー接続済み",
+      "Disconnected": "ランチャーが接続されていません。ランチャーから AzurPilot を開いてください。",
+      "RemoteUnavailable": "自動起動はローカル WebUI からのみ設定できます。",
+      "Unsupported": "このプラットフォームでは自動起動に対応していません。",
+      "Enabled": "有効",
+      "Disabled": "無効",
+      "Setting": "設定中...",
+      "Failed": "設定失敗"
+    },
+    "DeploySetting": {
+      "Title": "デプロイ設定",
+      "RestartNotice": "設定は config/deploy.yaml にすぐ保存されます。一部の設定は AzurPilot の再起動後に反映されます。",
+      "Loading": "デプロイ設定を読み込み中...",
+      "Refresh": "再読み込み",
+      "Save": "設定を保存",
+      "Saving": "保存中...",
+      "Saved": "config/deploy.yaml に保存しました。一部の設定は次回起動時に反映されます。",
+      "Failed": "操作に失敗しました",
+      "Enabled": "有効",
+      "Disabled": "無効",
+      "DemoDisabled": "デモモードではデプロイ設定を変更できません。",
+      "GroupGit": "Git 設定",
+      "GroupPython": "Python 設定",
+      "GroupAdb": "ADB 設定",
+      "GroupOcr": "OCR 設定",
+      "GroupUpdate": "更新設定",
+      "GroupMisc": "その他",
+      "GroupRemoteAccess": "リモートアクセス",
+      "GroupWebui": "WebUI 設定",
+      "Repository": "AzurPilot リポジトリ",
+      "RepositoryHelp": "インストールと更新に使う Git リポジトリです。中国本土では git://git.pull/AzurPilot も使用できます。",
+      "Branch": "ブランチ",
+      "BranchHelp": "安定版は通常 master、開発やテストでは dev、app などを指定します。",
+      "GitExecutable": "Git 実行ファイル",
+      "GitExecutableHelp": "git.exe のパスです。通常は既定値のままで問題ありません。",
+      "GitProxy": "Git プロキシ",
+      "GitProxyHelp": "HTTP または SOCKS5 プロキシです。空欄で無効になります。",
+      "SSLVerify": "Git SSL 検証",
+      "SSLVerifyHelp": "信頼できるネットワークでは有効にすることを推奨します。",
+      "AutoUpdate": "起動時に自動更新",
+      "AutoUpdateHelp": "AzurPilot 起動時にコードを確認して更新します。",
+      "PythonExecutable": "Python 実行ファイル",
+      "PythonExecutableHelp": "AzurPilot を実行する Python のパスです。",
+      "PypiMirror": "PyPI ミラー",
+      "PypiMirrorHelp": "依存関係のインストールに使うミラーです。空欄で既定のソースを使います。",
+      "InstallDependencies": "起動時に依存関係をインストール",
+      "InstallDependenciesHelp": "起動時に Python 依存関係を確認してインストールします。",
+      "AdbExecutable": "ADB 実行ファイル",
+      "AdbExecutableHelp": "adb.exe のパスです。",
+      "ReplaceAdb": "エミュレーターの ADB を置き換える",
+      "ReplaceAdbHelp": "中国製エミュレーターとの互換性のため有効推奨です。",
+      "AutoConnect": "エミュレーターへ自動接続",
+      "AutoConnectHelp": "起動時に利用可能なエミュレーターへ接続を試みます。",
+      "InstallUiautomator2": "uiautomator2 を再インストール",
+      "InstallUiautomator2Help": "起動時に uiautomator2 を確認して再インストールします。",
+      "UseOcrServer": "OCR サーバーを使用",
+      "UseOcrServerHelp": "各インスタンスが共有 OCR サービスへ接続し、メモリ使用量を抑えます。",
+      "StartOcrServer": "GUI 起動時に OCR サーバーを起動",
+      "StartOcrServerHelp": "WebUI 起動時に OCR サービスプロセスも起動します。",
+      "OcrServerPort": "OCR サーバーポート",
+      "OcrServerPortHelp": "WebUI が起動する OCR サービスの待受ポートです。",
+      "OcrClientAddress": "OCR クライアントアドレス",
+      "OcrClientAddressHelp": "インスタンスが OCR サービスへ接続するときのアドレスです。",
+      "EnableReload": "内蔵更新とリロードを有効化",
+      "EnableReloadHelp": "WebUI の内蔵更新と再起動機能を使用します。",
+      "CheckUpdateInterval": "更新確認間隔",
+      "CheckUpdateIntervalHelp": "更新を確認する間隔（分）です。0 で無効になります。",
+      "AutoRestartTime": "定時再起動時刻",
+      "AutoRestartTimeHelp": "更新がある場合に毎日自動再起動する時刻です。空欄で無効になります。",
+      "DiscordRichPresence": "Discord リッチプレゼンス",
+      "DiscordRichPresenceHelp": "AzurPilot の実行状態を Discord に表示します。",
+      "EnableRemoteAccess": "リモートアクセスを有効化",
+      "EnableRemoteAccessHelp": "SSH リバーストンネルで WebUI を公開します。公開前に必ずパスワードを設定してください。",
+      "SSHUser": "SSH ユーザー",
+      "SSHUserHelp": "リモートアクセス用のログインユーザー名です。空欄なら起動時に生成されます。",
+      "SSHServer": "SSH サーバー",
+      "SSHServerHelp": "リモートアクセス用サーバーです。形式は host:port です。",
+      "SSHExecutable": "SSH 実行ファイル",
+      "SSHExecutableHelp": "ssh.exe のパスです。空欄または ssh で PATH から探します。",
+      "WebuiHost": "WebUI 待受アドレス",
+      "WebuiHostHelp": "WebUI が待ち受けるホストです。例: 0.0.0.0、127.0.0.1、::。",
+      "WebuiPort": "WebUI ポート",
+      "WebuiPortHelp": "WebUI が待ち受けるポートです。",
+      "Language": "WebUI 言語",
+      "LanguageHelp": "WebUI の表示言語です。",
+      "Theme": "WebUI テーマ",
+      "ThemeHelp": "WebUI の見た目のテーマです。",
+      "DpiScaling": "システム DPI に追従",
+      "DpiScalingHelp": "システム DPI に合わせて画面サイズを調整します。",
+      "Password": "WebUI パスワード",
+      "PasswordHelp": "WebUI へアクセスするためのパスワードです。空欄なら未設定です。",
+      "CDN": "PyWebIO CDN",
+      "CDNHelp": "true、false、またはカスタム CDN URL を指定できます。",
+      "WebuiSSLKey": "SSL キーファイル",
+      "WebuiSSLKeyHelp": "WebUI HTTPS 用の SSL キーです。証明書とセットで設定してください。",
+      "WebuiSSLCert": "SSL 証明書ファイル",
+      "WebuiSSLCertHelp": "WebUI HTTPS 用の SSL 証明書です。キーとセットで設定してください。"
+    },
+    "StartupRun": {
+      "Title": "起動時に自動実行",
+      "Description": "有効にすると、WebUI またはランチャーが AzurPilot を起動したときにこのインスタンスを自動実行します。次回起動から有効です。",
+      "Loading": "起動ポリシーを読み込み中...",
+      "Enabled": "起動時自動実行リストに追加済み",
+      "Disabled": "起動時自動実行リストに未追加",
+      "Setting": "deploy.yaml に書き込み中...",
+      "Failed": "設定に失敗しました",
+      "Unavailable": "起動時自動実行設定を読み取れません"
+    },
     "Text": {
       "InvalidFeedBack": "フォーマットエラー。例: {0}",
       "Clear": "クリア",
@@ -5770,139 +5993,141 @@
       "ChooseFile": "ファイルを選択"
     },
     "Stat": {
-      "LoadApDataFailed": "Failed to load AP data: {e}",
-      "NoApData": "No AP change data yet. Data will be recorded after running OpSi-1.",
-      "Refresh": "Refresh",
-      "NoValidApData": "No valid AP data available.",
-      "ViewTitleLine": "Intraday Line (Detailed Fluctuation)",
-      "ViewTitleDay": "Day View ({day} Hourly Candles)",
-      "ViewTitleMonth": "Month View (Daily Candles)",
-      "CannotAggregateKline": "Unable to aggregate candle data.",
-      "ViewLineShort": "Line",
-      "DataPointsCount": "{count} data points",
-      "CandlesCount": "{count} candles",
-      "ViewLabel": "📊 View:",
-      "DetailLabel": "📈 Detail:",
-      "ViewLineButton": "Intraday (Detailed)",
-      "ViewDayButton": "Day View (Hourly K)",
-      "ViewMonthButton": "Month View (Daily K)",
-      "DetailChartTitle": "Daily AP Fluctuation Detail (24h)",
-      "ToggleDetailChart": "Detail Chart",
-      "DetailChartOn": "✓ On",
-      "DetailChartOff": "○ Off",
-      "LoadOpsiStatsFailed": "Failed to load OpSi stats: {e}",
-      "LoadExpStatsFailed": "Failed to load EXP stats: {e}",
-      "DailyExpCheckTitle": "Daily EXP Check",
-      "CheckTime": "Check time: {value}",
-      "TargetLevel": "Target level: {value}",
-      "ShipSlot": "Slot",
-      "Level": "Level",
-      "CurrentExpThisLevel": "Current EXP (Level)",
-      "TotalExp": "Total EXP",
-      "ExpToTarget": "EXP to target",
-      "SortiesNeeded": "Sorties needed",
-      "EstimatedTime": "Estimated time",
-      "NoExpData": "No EXP data yet. Data will be recorded after OpSi-1 leveling.",
-      "Month": "Month",
-      "BattleCount": "Battles",
-      "BattleRounds": "Rounds",
-      "SortieCost": "Sortie Cost",
-      "AkashiEncounters": "Akashi Encounters",
-      "AkashiRate": "Akashi Rate",
-      "SirenResearchDevices": "Siren Research Devices",
-      "SirenResearchRate": "Siren Research Rate",
-      "HazardLevel": "Corrosion Level",
-      "AverageAP": "Average AP",
-      "NetAP": "Net AP",
-      "LoopEfficiency": "Loop Efficiency",
-      "ExpEfficiency": "EXP efficiency: {value}/{unit}",
-      "ExpEfficiencyHeader": "EXP Efficiency",
-      "AvgBattleTime": "Avg battle time: {value}{unit}",
-      "AvgBattleTimeHeader": "Avg battle time",
-      "AvgRoundTime": "Avg round time",
-      "TodayBattles": "Today battles: {value}{unit}",
-      "TodayBattlesHeader": "Today battles",
-      "TodayExp": "Today EXP: {value}",
-      "TodayExpHeader": "Today EXP",
-      "TodayRun": "Today run: {value}{unit}",
-      "TodayRunHeader": "Today run",
-      "OpsiDataCollectionTitle": "Yukikaze OpSi-1 Data Collection",
-      "MonthlyPurchasedAP": "Monthly purchased AP: {value}",
-      "MeowDataCollectionTitle": "Meow Session Data",
-      "MeowRounds": "Meow Rounds",
-      "AvgMeowRoundTime": "Avg Meow Round Time",
-      "MeowLootTitle": "Meow Session Loot",
-      "NoMeowDataNotice": "No local Meowfficer farming loot data yet. It will be generated automatically after a run.",
-      "MeowAdvanceAdviceTitle": "Meow Early Start Advice",
-      "CurrentAP": "Current AP: {value}",
-      "ApPerRound": "AP per round: {value} AP",
-      "AvailableRounds": "Available rounds: {value}{unit}",
-      "AvgRoundDuration": "Avg round duration: {value}{unit}",
-      "CurrentMode": "Current mode: {value}",
-      "RecommendAhead": "Recommended lead time: {value}{unit}",
-      "RoundUnit": " rounds",
-      "SecondUnit": "s",
-      "HourUnit": "h",
-      "MinuteUnit": "m",
-      "ExportModuleLoadFailed": "Export failed: cannot load stats module: {e}",
-      "CsvHeaderAkashiRate": "Akashi Rate (%)",
-      "CsvHeaderLoopEfficiency": "Loop Efficiency (%)",
-      "CsvHeaderMonthlyPurchasedAP": "Monthly Purchased AP",
-      "CsvFilenameTemplate": "opsi1_leveling_{month}_details.csv",
-      "SavedToDesktop": "Saved to desktop: {path}",
-      "SaveDesktopFailed": "Failed to save to desktop: {e}",
-      "ExportAndSaveDesktop": "Export and Save to Desktop",
-      "NoShipExpData": "No ship EXP data. Run \"Daily EXP Check\" first.",
-      "ShipExpProgressTitle": "Daily EXP Check: Detected Ship Levels and Progress",
-      "LastCheckTime": "Last check time: {value}",
-      "AvgOpsiRoundTime": "Avg OpSi-1 round time: {value}{unit}",
-      "TodayBattleUnit": "",
-      "NoTodayBattleData": "No battle data for today yet. It will update automatically after battles.",
-      "LoadShipExpFailed": "Failed to load ship EXP data: {e}",
-      "TargetExpRequired": "EXP required for target level",
-      "BattlesCompleted": "Battles completed",
-      "ExpRemaining": "EXP remaining",
-      "StartCleanupTime": "Suggested cleanup start: {value}",
-      "NextOsReset": "Next OS reset: {value}",
-      "MeowAutoCleanupStatus": "Auto early cleanup: {value}",
-      "CommissionIncomeTitle": "Gui.Stat.CommissionIncomeTitle",
-      "CommissionIncomeMonth": "Gui.Stat.CommissionIncomeMonth",
-      "CommissionIncomeWeek": "Gui.Stat.CommissionIncomeWeek",
-      "CommissionIncomeDay": "Gui.Stat.CommissionIncomeDay",
-      "CommissionIncomeNoData": "Gui.Stat.CommissionIncomeNoData",
-      "CommissionIncomeItemGem": "Gui.Stat.CommissionIncomeItemGem",
-      "CommissionIncomeItemCube": "Gui.Stat.CommissionIncomeItemCube",
-      "CommissionIncomeItemChip": "Gui.Stat.CommissionIncomeItemChip",
-      "CommissionIncomeItemOil": "Gui.Stat.CommissionIncomeItemOil",
-      "CommissionIncomeItemCoin": "Gui.Stat.CommissionIncomeItemCoin",
-      "CommissionIncomeHeaderItem": "Gui.Stat.CommissionIncomeHeaderItem",
-      "CommissionIncomeHeaderTotal": "Gui.Stat.CommissionIncomeHeaderTotal",
-      "CommissionIncomeHeaderCount": "Gui.Stat.CommissionIncomeHeaderCount",
-      "CommissionIncomeHeaderAvg": "Gui.Stat.CommissionIncomeHeaderAvg",
-      "CommissionIncomeTotalCommissions": "Gui.Stat.CommissionIncomeTotalCommissions",
-      "CommissionIncomeRecentTitle": "Gui.Stat.CommissionIncomeRecentTitle",
+      "LoadApDataFailed": "APデータの読み込みに失敗しました: {e}",
+      "NoApData": "AP変動データがありません。侵蝕1タスク実行後に自動記録されます",
+      "Refresh": "更新",
+      "NoValidApData": "有効なAPデータがありません",
+      "ViewTitleLine": "分時チャート（詳細変動）",
+      "ViewTitleDay": "日表示（{day} 時間足）",
+      "ViewTitleMonth": "月表示（日足）",
+      "CannotAggregateKline": "K線データを集約できません",
+      "ViewLineShort": "分時",
+      "DataPointsCount": "{count} データポイント",
+      "CandlesCount": "{count} 本のK線",
+      "ViewLabel": "📊 表示:",
+      "DetailLabel": "📈 詳細:",
+      "ViewLineButton": "分時（詳細変動）",
+      "ViewDayButton": "日表示（時間足K線）",
+      "ViewMonthButton": "月表示（日足K線）",
+      "DetailChartTitle": "日別AP変動詳細（24時間）",
+      "ToggleDetailChart": "詳細チャート",
+      "DetailChartOn": "✓ オン",
+      "DetailChartOff": "○ オフ",
+      "LoadOpsiStatsFailed": "OpSi統計の読み込みに失敗しました: {e}",
+      "LoadExpStatsFailed": "経験値統計の読み込みに失敗しました: {e}",
+      "DailyExpCheckTitle": "日次経験値チェック",
+      "CheckTime": "チェック時間: {value}",
+      "TargetLevel": "目標レベル: {value}",
+      "ShipSlot": "艦位",
+      "Level": "レベル",
+      "CurrentExpThisLevel": "現在の経験値（今レベル）",
+      "TotalExp": "累計経験値",
+      "ExpToTarget": "目標までの経験値",
+      "SortiesNeeded": "必要出撃回数",
+      "EstimatedTime": "推定時間",
+      "NoExpData": "経験値データがありません。侵蝕1練級実行後に自動記録されます",
+      "Month": "月",
+      "BattleCount": "戦闘回数",
+      "BattleRounds": "戦闘ラウンド",
+      "SortieCost": "出撃消費",
+      "AkashiEncounters": "明石遭遇回数",
+      "AkashiRate": "明石遭遇率",
+      "SirenResearchDevices": "クレーン回数",
+      "SirenResearchRate": "クレーン確率",
+      "HazardLevel": "侵蝕レベル",
+      "AverageAP": "平均AP",
+      "NetAP": "純獲得AP",
+      "LoopEfficiency": "ループ効率",
+      "ExpEfficiency": "経験値効率: {value}/{unit}",
+      "ExpEfficiencyHeader": "経験値効率",
+      "AvgBattleTime": "平均戦闘時間: {value}{unit}",
+      "AvgBattleTimeHeader": "平均戦闘時間",
+      "AvgRoundTime": "平均ラウンド時間",
+      "TodayBattles": "今日の戦闘: {value}{unit}",
+      "TodayBattlesHeader": "今日の戦闘",
+      "TodayExp": "今日の経験値: {value}",
+      "TodayExpHeader": "今日の経験値",
+      "TodayRun": "今日の実行: {value}{unit}",
+      "TodayRunHeader": "今日の実行",
+      "OpsiDataCollectionTitle": "雪風様の侵蝕1データ収集",
+      "MonthlyPurchasedAP": "今月購入AP: {value}",
+      "MeowDataCollectionTitle": "短猫データ収集",
+      "MeowRounds": "短猫ラウンド数",
+      "AvgMeowRoundTime": "平均短猫ラウンド時間",
+      "MeowLootTitle": "短猫収穫",
+      "NoMeowDataNotice": "短猫収穫データがありません。1回実行後に自動生成されます",
+      "MeowAdvanceAdviceTitle": "短猫早め開始アドバイス",
+      "CurrentAP": "現在のAP: {value}",
+      "ApPerRound": "1ラウンド消費: {value} AP",
+      "AvailableRounds": "実行可能ラウンド数: {value}{unit}",
+      "AvgRoundDuration": "平均ラウンド時間: {value}{unit}",
+      "CurrentMode": "現在のモード: {value}",
+      "RecommendAhead": "推奨早め開始: {value}{unit}",
+      "RoundUnit": " ラウンド",
+      "SecondUnit": "秒",
+      "HourUnit": "時間",
+      "MinuteUnit": "分",
+      "ExportModuleLoadFailed": "エクスポート失敗: 統計モジュールを読み込めません: {e}",
+      "CsvHeaderAkashiRate": "明石遭遇率(%)",
+      "CsvHeaderLoopEfficiency": "ループ効率(%)",
+      "CsvHeaderMonthlyPurchasedAP": "今月購入AP",
+      "CsvFilenameTemplate": "侵蝕1練級_{month}_詳細データ.csv",
+      "SavedToDesktop": "デスクトップに保存しました: {path}",
+      "SaveDesktopFailed": "デスクトップへの保存に失敗しました: {e}",
+      "ExportAndSaveDesktop": "デスクトップにエクスポートして保存",
+      "NoShipExpData": "艦船経験値データがありません。先に「日次経験値チェック」を実行してください",
+      "ShipExpProgressTitle": "日次経験値チェック: 検出された艦娘レベルと進捗",
+      "LastCheckTime": "前回チェック時間: {value}",
+      "AvgOpsiRoundTime": "平均侵蝕1ラウンド時間: {value}{unit}",
+      "TodayBattleUnit": "戦闘",
+      "NoTodayBattleData": "今日の戦闘データがありません。戦闘後に自動更新されます",
+      "LoadShipExpFailed": "艦船経験値データの読み込みに失敗しました: {e}",
+      "TargetExpRequired": "目標レベルに必要な経験値",
+      "BattlesCompleted": "完了戦闘数",
+      "ExpRemaining": "残り必要経験値",
+      "StartCleanupTime": "推奨クリーンアップ開始: {value}",
+      "NextOsReset": "次回大世界リセット: {value}",
+      "MeowAutoCleanupStatus": "自動先行クリーンアップ: {value}",
+      "CommissionIncomeTitle": "委託収益統計",
+      "CommissionIncomeMonth": "今月",
+      "CommissionIncomeWeek": "今週",
+      "CommissionIncomeDay": "今日",
+      "CommissionIncomeNoData": "委託収益データがありません。委託実行後に自動更新されます",
+      "CommissionIncomeItemGem": "ダイヤ",
+      "CommissionIncomeItemCube": "キューブ",
+      "CommissionIncomeItemChip": "コグチップ",
+      "CommissionIncomeItemOil": "燃料",
+      "CommissionIncomeItemCoin": "資金",
+      "CommissionIncomeHeaderItem": "アイテム",
+      "CommissionIncomeHeaderTotal": "合計",
+      "CommissionIncomeHeaderCount": "委託回数",
+      "CommissionIncomeHeaderAvg": "平均/回",
+      "CommissionIncomeTotalCommissions": "委託総回数: {value}",
+      "CommissionIncomeRecentTitle": "最近の委託記録",
       "ResourceChartTitle": "全リソース推移",
-      "LoadResourceDataFailed": "Gui.Stat.LoadResourceDataFailed",
-      "NoResourceData": "Gui.Stat.NoResourceData",
-      "NoValidResourceData": "Gui.Stat.NoValidResourceData"
+      "LoadResourceDataFailed": "リソースデータの読み込みに失敗しました: {e}",
+      "NoResourceData": "リソース変動データがありません。スクリプト実行後に自動記録されます",
+      "NoValidResourceData": "有効なリソースデータがありません"
     },
     "Tactical": {
-      "SkillAutoSwitch": "Gui.Tactical.SkillAutoSwitch"
+      "SkillAutoSwitch": "スキル自動切替"
     },
     "OpsiScheduling": {
-      "UseSmartSchedulingOperationCoinsPreserve": "Gui.OpsiScheduling.UseSmartSchedulingOperationCoinsPreserve",
-      "OperationCoinsPreserve": "Gui.OpsiScheduling.OperationCoinsPreserve",
-      "ActionPointPreserve": "Gui.OpsiScheduling.ActionPointPreserve",
-      "OperationCoinsReturnThreshold": "Gui.OpsiScheduling.OperationCoinsReturnThreshold",
-      "EnableMeowfficerFarming": "Gui.OpsiScheduling.EnableMeowfficerFarming",
-      "EnableObscure": "Gui.OpsiScheduling.EnableObscure",
-      "EnableAbyssal": "Gui.OpsiScheduling.EnableAbyssal",
-      "EnableStronghold": "Gui.OpsiScheduling.EnableStronghold",
-      "MeowStartEarlyMode": "Gui.OpsiScheduling.MeowStartEarlyMode"
+      "UseSmartSchedulingOperationCoinsPreserve": "スマートスケジューリング作戦コイン保留",
+      "OperationCoinsPreserve": "作戦コイン保留",
+      "ActionPointPreserve": "行動力保留",
+      "ActionPointEarlyTriggerEnable": "行動力の早期スケジュール",
+      "ActionPointEarlyTriggerThreshold": "早期スケジュール行動力しきい値",
+      "OperationCoinsReturnThreshold": "作戦コイン戻り閾値",
+      "EnableMeowfficerFarming": "指揮ニャー収集を有効",
+      "EnableObscure": "隠秘海域を有効",
+      "EnableAbyssal": "深淵海域を有効",
+      "EnableStronghold": "セイレーン要塞を有効",
+      "MeowStartEarlyMode": "短猫早期開始モード"
     },
     "Misc": {
-      "Enabled": "Enabled",
-      "Disabled": "Disabled"
+      "Enabled": "有効",
+      "Disabled": "無効"
     },
     "OOBE": {
       "ImportTitle": "旧データをインポート",

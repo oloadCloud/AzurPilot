@@ -84,6 +84,10 @@ class GeneratedConfig:
     Scheduler_ServerUpdate = '00:00'
     Scheduler_Sensitive = False  # True, False
 
+    # 配置组 `Restart`
+    Restart_RandomDelay = '5, 50'
+    Restart_ClearCache = False  # True, False
+
     # 配置组 `Emulator`
     Emulator_Serial = 'auto'
     Emulator_PackageName = 'auto'  # auto, com.bilibili.azurlane, com.YoStarEN.AzurLane, com.YoStarJP.AzurLane, com.hkmanjuu.azurlane.gp, com.bilibili.blhx.huawei, com.bilibili.blhx.honor, com.bilibili.blhx.mi, com.tencent.tmgp.bilibili.blhx, com.bilibili.blhx.baidu, com.bilibili.blhx.qihoo, com.bilibili.blhx.nearme.gamecenter, com.bilibili.blhx.vivo, com.bilibili.blhx.mz, com.bilibili.blhx.dl, com.bilibili.blhx.lenovo, com.bilibili.blhx.uc, com.bilibili.blhx.mzw, com.yiwu.blhx.yx15, com.bilibili.blhx.m4399, com.bilibili.blhx.bilibiliMove, com.hkmanjuu.azurlane.gp.mc
@@ -117,9 +121,9 @@ class GeneratedConfig:
     Error_AdbOfflineRestart = False
     Error_AdbOfflineThreshold = 3
     Error_LlmAnalysis = True
-    Error_LlmApiKey = 'sk-O6ZQRe5T4NJVV8gdVTFHTZAI3Q8ZKtJMWdrrKeGljw3zUX4b'
-    Error_LlmApiBase = 'https://api.nanoda.work/v1'
-    Error_LlmModel = 'Nvidia/qwen/qwen2.5-coder-32b-instruct'
+    Error_LlmApiKey = None
+    Error_LlmApiBase = 'https://api.xiaomimimo.com/v1'
+    Error_LlmModel = 'mimo-v2.5-pro'
 
     # 配置组 `Optimization`
     Optimization_OcrDevice = 'auto'  # auto, cpu, gpu, ane
@@ -161,7 +165,7 @@ class GeneratedConfig:
     PublicEmotion_FleetOnsen = False
 
     # 配置组 `YukikazeTaskManager`
-    YukikazeTaskManager_TaskPriorityAdjustment = 'Restart\n> OpsiCrossMonth\n> Commission > Tactical > Research\n> Exercise\n> Dorm > Meowfficer > Guild > Gacha\n> Reward\n> ShopFrequent > ShopOnce > Shipyard > Freebies\n> PrivateQuarters\n> OpsiExplore\n> Minigame > Awaken\n> OpsiAshBeacon\n> OpsiDaily > OpsiShop > OpsiVoucher > EventShop\n> OpsiAbyssal > OpsiStronghold > OpsiObscure > OpsiArchive\n> Daily > Hard > OpsiAshBeacon > OpsiAshAssist > OpsiMonthBoss\n> Sos > EventSp > EventA > EventB > EventC > EventD\n> RaidDaily > CoalitionSp > WarArchives > MaritimeEscort\n> IslandJuuEatery > IslandJuuCoffee > IslandGrill > IslandTeahouse > IslandRestaurant\n> IslandFarm > IslandRancher > IslandMineForest > IslandDailyGather > IslandManufacture\n> IslandAirDrop > IslandBusiness > IslandDailyOrder > IslandDailyInteract > IslandPearlSell > IslandCargoPreparation\n> Event > Event2 > Event3 > Raid > Hospital > HospitalEvent > Coalition > RaidScuttle > Main > Main2 > Main3\n> OpsiMeowfficerFarming\n> GemsFarming\n> Ambush11\n> OpsiHazard1Leveling\n> ThreeOilLowCost'
+    YukikazeTaskManager_TaskPriorityAdjustment = 'Restart\n> OpsiCrossMonth\n> OpsiScheduling\n> Commission > Tactical > Research\n> Exercise\n> Dorm > Meowfficer > Guild > Gacha\n> Reward\n> ShopFrequent > ShopOnce > Shipyard > Freebies\n> PrivateQuarters\n> OpsiExplore\n> Minigame > Awaken\n> OpsiAshBeacon\n> OpsiDaily > OpsiShop > OpsiVoucher > EventShop\n> OpsiAbyssal > OpsiStronghold > OpsiObscure > OpsiArchive\n> Daily > Hard > OpsiAshBeacon > OpsiAshAssist > OpsiMonthBoss\n> Sos > EventSp > EventA > EventB > EventC > EventD\n> RaidDaily > CoalitionSp > WarArchives > MaritimeEscort\n> IslandJuuEatery > IslandJuuCoffee > IslandGrill > IslandTeahouse > IslandRestaurant\n> IslandFarm > IslandRancher > IslandMineForest > IslandDailyGather > IslandManufacture\n> IslandAirDrop > IslandBusiness > IslandDailyOrder > IslandDailyInteract > IslandPearlSell > IslandCargoPreparation\n> Event > Event2 > Event3 > Raid > Hospital > HospitalEvent > Coalition > RaidScuttle > Main > Main2 > Main3\n> OpsiMeowfficerFarming\n> GemsFarming\n> Ambush11\n> OpsiHazard1Leveling\n> ThreeOilLowCost'
 
     # 配置组 `OneClickRetire`
     OneClickRetire_KeepLimitBreak = 'keep_limit_break'  # keep_limit_break, do_not_keep
@@ -189,7 +193,7 @@ class GeneratedConfig:
     Campaign_Use2xBook = False
     Campaign_AmbushEvade = True
     Campaign_UseRecommendFleet = False
-    Campaign_DefeatWithdraw = True
+    Campaign_DefeatWithdraw = 'withdraw_stop'  # withdraw_continue, switch_fleet, withdraw_stop
 
     # 配置组 `StopCondition`
     StopCondition_OilLimit = 1000
@@ -199,6 +203,12 @@ class GeneratedConfig:
     StopCondition_StageIncrease = False
     StopCondition_GetNewShip = False
     StopCondition_ReachLevel = 0
+
+    # 配置组 `WarArchives`
+    WarArchives_DailyRunCount = 0
+    WarArchives_DailyRunCountRemain = 0
+    WarArchives_DailyRunCountRecord = datetime.datetime(2020, 1, 1, 0, 0)
+    WarArchives_DailyRunCountLimit = 0
 
     # 配置组 `Fleet`
     Fleet_Fleet1 = 1  # 1, 2, 3, 4, 5, 6
@@ -485,7 +495,7 @@ class GeneratedConfig:
     PrivateQuarters_BuyRoses = True
     PrivateQuarters_BuyCake = False
     PrivateQuarters_TargetInteract = True
-    PrivateQuarters_TargetShip = 'anchorage'  # anchorage, noshiro, sirius, new_jersey, taihou, aegir
+    PrivateQuarters_TargetShip = 'anchorage'  # anchorage, noshiro, sirius, new_jersey, taihou, aegir, nakhimov
 
     # 配置组 `Daily`
     Daily_UseDailySkip = True
@@ -594,6 +604,7 @@ class GeneratedConfig:
 
     # 配置组 `OpsiMeowfficerFarming`
     OpsiMeowfficerFarming_ActionPointPreserve = 1000
+    OpsiMeowfficerFarming_SmartNaturalAPCleanup = False
     OpsiMeowfficerFarming_HazardLevel = 5  # 2, 3, 4, 5, 6, 10
     OpsiMeowfficerFarming_TargetZone = 0
     OpsiMeowfficerFarming_StayInZone = False
@@ -637,6 +648,8 @@ class GeneratedConfig:
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True  # True, False
     OpsiScheduling_OperationCoinsPreserve = 40000
     OpsiScheduling_ActionPointPreserve = 200
+    OpsiScheduling_ActionPointEarlyTriggerEnable = True  # True, False
+    OpsiScheduling_ActionPointEarlyTriggerThreshold = 200
     OpsiScheduling_OperationCoinsReturnThreshold = 20000
     OpsiScheduling_EnableMeowfficerFarming = True  # True, False
     OpsiScheduling_EnableObscure = False  # True, False
@@ -651,11 +664,13 @@ class GeneratedConfig:
 
     # 配置组 `IslandFarm`
     IslandFarm_Positions = 3  # 1, 2, 3, 4
+    IslandFarm_WorkerFilter = 'WorkerJuu'
     IslandFarm_MinFarm = 660
     IslandFarm_PlantPotatoes = 4  # 0, 1, 2, 3, 4
 
     # 配置组 `IslandOrchard`
     IslandOrchard_Positions = 4  # 1, 2, 3, 4
+    IslandOrchard_WorkerFilter = 'WorkerJuu'
     IslandOrchard_MinOrchard = 300
     IslandOrchard_IgnoreAvocado = True
     IslandOrchard_PlantRubber = 0  # 0, 1, 2, 3, 4
@@ -663,6 +678,7 @@ class GeneratedConfig:
 
     # 配置组 `IslandNursery`
     IslandNursery_Positions = 2  # 1, 2
+    IslandNursery_WorkerFilter = 'WorkerJuu'
     IslandNursery_MinNursery = 0
     IslandNursery_IgnorePineapple = True
     IslandNursery_PlantLavender = 2  # 0, 1, 2
@@ -673,6 +689,7 @@ class GeneratedConfig:
     IslandRancher_Milk = True
     IslandRancher_RancherFilter = 'WorkerJuu'
     IslandRancher_Wool = True
+    IslandRancher_WoolWorkerFilter = 'WorkerJuu'
 
     # 配置组 `IslandFishery`
     IslandFishery_Positions = 3  # 1, 2, 3
@@ -680,6 +697,7 @@ class GeneratedConfig:
     IslandFishery_MinYellowfinTuna = 50
     IslandFishery_MinShell = 50
     IslandFishery_MinShrimp = 50
+    IslandFishery_MinCrayfish = 50
     IslandFishery_MinCrab = 50
     IslandFishery_MinSquid = 50
     IslandFishery_MinSeaCucumber = 50
@@ -689,6 +707,7 @@ class GeneratedConfig:
     # 配置组 `IslandMine`
     IslandMine_Positions = 1  # 1, 2, 3, 4
     IslandMine_MineSilver = 1  # 0, 1, 2, 3, 4
+    IslandMine_WorkerFilter = 'WorkerJuu'
     IslandMine_MinCopper = 50
     IslandMine_MinAluminium = 50
     IslandMine_MinIron = 50
@@ -698,9 +717,13 @@ class GeneratedConfig:
     # 配置组 `IslandForest`
     IslandForest_Positions = 1  # 1, 2, 3, 4
     IslandForest_CutElegant = 1  # 0, 1, 2, 3, 4
+    IslandForest_WorkerFilter = 'WorkerJuu'
     IslandForest_MinElegant = 50
     IslandForest_MinPractical = 50
     IslandForest_MinSelected = 50
+
+    # 配置组 `IslandDailyGather`
+    IslandDailyGather_WorkerFilter = ''
 
     # 配置组 `IslandRestaurant`
     IslandRestaurant_PostNumber = 2  # 1, 2
@@ -753,25 +776,25 @@ class GeneratedConfig:
     # 配置组 `IslandGrill`
     IslandGrill_PostNumber = 1  # 1, 2
     IslandGrill_ChefFilter = 'WorkerJuu'
-    IslandGrill_Meal1 = 'double_energy'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal1 = 'double_energy'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber1 = 7
-    IslandGrill_Meal2 = 'steak_bowl'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal2 = 'steak_bowl'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber2 = 7
-    IslandGrill_Meal3 = 'stir_fried_chicken'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal3 = 'stir_fried_chicken'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber3 = 7
-    IslandGrill_Meal4 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal4 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber4 = 0
-    IslandGrill_Meal5 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal5 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber5 = 0
-    IslandGrill_Meal6 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal6 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber6 = 0
-    IslandGrill_Meal7 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal7 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber7 = 0
-    IslandGrill_Meal8 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrill_Meal8 = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandGrill_MealNumber8 = 0
 
     # 配置组 `IslandGrillNextTask`
-    IslandGrillNextTask_AwayCook = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandGrillNextTask_AwayCook = 'None'  # None, roasted_skewer, chicken_potato, carrot_omelette, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
 
     # 配置组 `IslandJuuEatery`
     IslandJuuEatery_PostNumber = 1  # 1, 2
@@ -895,11 +918,11 @@ class GeneratedConfig:
     # 配置组 `IslandBusinessShop4`
     IslandBusinessShop4_Char1 = 'None'  # None, WorkerJuu, Cheshire, YingSwei, Saratoga, Akashi, NewJersey, Tashkent, LeMalin, Shimakaze, Amagi_chan, Unicorn, ChaoHo, ChenHai, WilliamDPorter, Helena, Friedrich, Atago, Yixian, August, Eugen, Hood, Javelin, Laffey, Explorer, Navigator, OceanCrosser, FeiYun, Takao
     IslandBusinessShop4_Char2 = 'None'  # None, WorkerJuu, Cheshire, YingSwei, Saratoga, Akashi, NewJersey, Tashkent, LeMalin, Shimakaze, Amagi_chan, Unicorn, ChaoHo, ChenHai, WilliamDPorter, Helena, Friedrich, Atago, Yixian, August, Eugen, Hood, Javelin, Laffey, Explorer, Navigator, OceanCrosser, FeiYun, Takao
-    IslandBusinessShop4_Product1 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, carnival, double_energy
-    IslandBusinessShop4_Product2 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, carnival, double_energy
-    IslandBusinessShop4_Product3 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, carnival, double_energy
-    IslandBusinessShop4_Product4 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, carnival, double_energy
-    IslandBusinessShop4_Product5 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, carnival, double_energy
+    IslandBusinessShop4_Product1 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
+    IslandBusinessShop4_Product2 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
+    IslandBusinessShop4_Product3 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
+    IslandBusinessShop4_Product4 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
+    IslandBusinessShop4_Product5 = 'None'  # None, roasted_skewer, stir_fried_chicken, steak_bowl, crayfish_stir_fry, carnival, double_energy
     IslandBusinessShop4_BoostReplaceFilter = '30 > 20 > 10'
 
     # 配置组 `IslandBusinessShop5`
