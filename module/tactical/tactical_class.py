@@ -94,7 +94,7 @@ class ExpOnSkillSelect(Ocr):
         return image_left_strip(image, threshold=105, length=42)
 
 
-SKILL_EXP = ExpOnBookSelect(buttons=OCR_SKILL_EXP, lang='cnocr')
+SKILL_EXP = ExpOnBookSelect(buttons=OCR_SKILL_EXP)
 BOOKS_GRID = ButtonGrid(origin=(213, 292), delta=(147, 117), button_shape=(98, 98), grid_shape=(6, 2))
 BOOK_FILTER = Filter(
     regex=re.compile(
