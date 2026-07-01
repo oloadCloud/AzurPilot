@@ -2,7 +2,7 @@ from module.guild.lobby import GuildLobby
 from module.guild.logistics import GuildLogistics
 from module.guild.operations import GuildOperations
 from module.ui.page import page_guild, page_main
-from datetime import datetime, timedelta
+
 
 class RewardGuild(GuildLobby, GuildLogistics, GuildOperations):
     def run(self):
