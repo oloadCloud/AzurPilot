@@ -13,6 +13,7 @@ from module.base.decorator import del_cached_property
 from module.base.api_client import ApiClient
 from module.config.config import AzurLaneConfig, TaskEnd
 from module.config.deep import deep_get, deep_set
+from module.config.time_source import now as current_time
 from module.config.utils import (
     DEFAULT_CONFIG_NAME,
     ensure_time,
@@ -71,7 +72,7 @@ class AzurLaneAutoScript:
         self.consecutive_game_stuck = 0
         self.consecutive_adb_offline = 0
         # 上次计划重启模拟器的时间戳
-        self.last_emulator_restart_time = time.time()
+        self.last_emulator_restart_time = time.monotonic()
 
     def _try_restart_emulator(self):
         """
@@ -123,6 +124,36 @@ class AzurLaneAutoScript:
             return True
         except Exception as e:
             logger.error(f'重启模拟器失败: {e}')
+            return False
+
+    def _start_emulator_after_long_wait(self):
+        """
+        长时间等待关闭模拟器后，显式启动模拟器。
+
+        这是省资源功能的正常恢复路径，不受 ADB 离线重启开关和次数限制。
+
+        Returns:
+            bool: 启动成功返回 True，失败返回 False。
+        """
+        logger.hr('长时间等待后启动模拟器', level=1)
+        try:
+            from module.device.platform import Platform
+
+            platform = Platform(self.config, connect=False)
+            if platform.emulator_instance is None:
+                logger.warning('未找到模拟器实例，无法在长时间等待后启动模拟器')
+                return False
+
+            if platform.emulator_start():
+                logger.info('长时间等待后模拟器启动完成')
+                if 'device' in self.__dict__:
+                    del_cached_property(self, 'device')
+                return True
+
+            logger.warning('长时间等待后启动模拟器失败，继续调度恢复流程')
+            return False
+        except Exception as e:
+            logger.warning(f'长时间等待后启动模拟器失败，继续调度恢复流程: {e}')
             return False
 
     @cached_property
@@ -495,7 +526,7 @@ class AzurLaneAutoScript:
             return False
 
         next_run = last_update + timedelta(minutes=delay)
-        if next_run <= datetime.now().replace(microsecond=0):
+        if next_run <= current_time().replace(microsecond=0):
             logger.info(f'每日重启随机延后 {delay} 分钟已到达，继续重启')
             return False
 
@@ -1021,7 +1052,7 @@ class AzurLaneAutoScript:
         future = future + timedelta(seconds=1)
         self.config.start_watching()
         while 1:
-            if datetime.now() > future:
+            if current_time() > future:
                 return True
             if self.stop_event is not None:
                 if self.stop_event.is_set():
@@ -1053,11 +1084,39 @@ class AzurLaneAutoScript:
             if self.config.task.command != 'Alas':
                 release_resources(next_task=task.command)
 
-            if task.next_run > datetime.now():
+            if task.next_run > current_time():
                 logger.info(f'等待直到 {task.next_run} 执行任务 `{task.command}`')
                 self.is_first_task = False
                 method = self.config.Optimization_WhenTaskQueueEmpty
-                if method == 'close_game':
+                wait_duration = task.next_run - current_time()
+                if (
+                    self.config.Optimization_CloseEmulatorDuringLongWait
+                    and wait_duration > timedelta(hours=3)
+                ):
+                    logger.info(
+                        f'下一个任务 `{task.command}` 将在 {wait_duration} 后运行，'
+                        '等待期间关闭模拟器'
+                    )
+                    release_resources()
+                    self.device.release_during_wait()
+                    try:
+                        if self.device.emulator_stop():
+                            logger.info('等待期间已关闭模拟器')
+                        else:
+                            logger.warning('等待期间关闭模拟器失败，继续等待')
+                    except Exception as e:
+                        logger.warning(f'等待期间关闭模拟器失败，继续等待: {e}')
+                    if 'device' in self.__dict__:
+                        del_cached_property(self, 'device')
+                    if not self.wait_until(task.next_run):
+                        del_cached_property(self, 'config')
+                        continue
+                    self._start_emulator_after_long_wait()
+                    if task.command != 'Restart':
+                        self.config.task_call('Restart')
+                        del_cached_property(self, 'config')
+                        continue
+                elif method == 'close_game':
                     logger.info('等待期间关闭游戏')
                     self.device.app_stop()
                     release_resources()
@@ -1135,14 +1194,14 @@ class AzurLaneAutoScript:
                     self.config.task_call('Restart')
                 # 检查计划的模拟器重启（在任务之间，不会中断正在运行的任务）
                 if self.config.EmulatorManagement_ScheduledEmulatorRestart:
-                    elapsed_hours = (time.time() - self.last_emulator_restart_time) / 3600
+                    elapsed_hours = (time.monotonic() - self.last_emulator_restart_time) / 3600
                     interval = self.config.EmulatorManagement_RestartIntervalHours
                     if elapsed_hours >= interval:
                         logger.hr('计划的模拟器重启', level=1)
                         logger.info(f'模拟器已运行 {elapsed_hours:.1f} 小时, '
                                     f'计划重启间隔为 {interval} 小时')
                         if self._try_restart_emulator():
-                            self.last_emulator_restart_time = time.time()
+                            self.last_emulator_restart_time = time.monotonic()
                             self.config.task_call('Restart')
                             del_cached_property(self, 'config')
                             continue

@@ -1,12 +1,14 @@
 from module.island.island import *
 from time import sleep
 from module.ui.scroll import Scroll
+from datetime import timedelta
+from module.config.time_source import now as current_time
 
 
 class IslandAirDrop(Island):
     def run(self):
         self.island_error = False
-        now = datetime.now()
+        now = current_time()
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         next_daily_time = today.replace(
             hour=1, minute=0, second=0, microsecond=0
@@ -88,7 +90,7 @@ class IslandAirDrop(Island):
         else:
             logger.info("已禁用拜访其他玩家岛屿，跳过好友补给")
             has_drops = False
-        self.config.IslandAirDrop_LastSteal = datetime.now().replace(microsecond=0)
+        self.config.IslandAirDrop_LastSteal = current_time().replace(microsecond=0)
 
         if has_drops and next_steal_time < last_attempt_today:
             self.config.task_delay(target=next_steal_time)
