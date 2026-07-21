@@ -278,6 +278,10 @@
       "name": "スマートスケジューリング+",
       "help": "セイレーン作戦スマートスケジューリング機能。侵蝕1レベリングとゴールドコイン補充タスク間の切り替えを調整します。\n有効にすると、ゴールドコインと行動力に基づいて異なるタスク間を自動的に切り替え、プッシュ通知を送信します。"
     },
+    "OpsiPreventActionPointOverflow": {
+      "name": "行動力溢れ防止",
+      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します"
+    },
     "OpsiCrossMonth": {
       "name": "月跨ぎデイリー",
       "help": "    AzurPilotはセイレーン作戦の月跨ぎリセットの10分前にセイレーン作戦に入り、リセットを待ちますが退出しません。その後、新しい日のセイレーン作戦デイリー、隠秘海域、深淵海域と指揮ニャファームを完了して、追加の報酬を獲得します。セイレーン作戦デイリーを実行する場合は「セイレーン作戦-デイリー」タスク設定に従い、その他も同様です。\n    重要：AzurPilotが月跨ぎを待っている間は、ゲームを操作しないでください。"
@@ -369,6 +373,10 @@
     "BoxDisassemble": {
       "name": "装備箱分解",
       "help": ""
+    },
+    "AutoEquip": {
+      "name": "自動装備",
+      "help": "ドックの先頭艦から開始し、クイック装備変更を開いて装備中フィルターを有効化し、艦船詳細のスワイプで巡回します。実際の装備選択ロジックは未設定です。"
     },
     "Benchmark": {
       "name": "パフォーマンステスト",
@@ -519,6 +527,7 @@
       "cn_android-26": "[国服] 冬月计划",
       "cn_android-27": "[国服] 长弓计划",
       "cn_android-28": "[国服] 裁决协议",
+      "cn_android-29": "[国服] 帷幕计划",
       "cn_ios-0": "[国服] 夏威夷",
       "cn_ios-1": "[国服] 珊瑚海",
       "cn_ios-2": "[国服] 中途岛",
@@ -741,6 +750,41 @@
       "onnxruntime": "ONNX Runtime",
       "ncnn": "ncnn (Vulkan)"
     },
+    "OcrModelVersionEnglish": {
+      "name": "OCR 英語モデルバージョン",
+      "help": "英語 OCR モデルのバージョンを選択します。auto は推奨の英語 AlOCR v2.6 モデルを使用します。この項目は英語 Azur Lane モデルに適用されます。ncnn バックエンドでは無視されます。",
+      "auto": "自動推奨",
+      "alocr_en_900k": "alocr_en_900k",
+      "azur_lane_v6_6": "英語 v6.6 (Azur Lane)",
+      "azur_lane_v6_5": "英語 v6.5 (Azur Lane)",
+      "ppocr_v6": "汎用 PP-OCRv6",
+      "alocr_en_v2_6": "英語 AlOCR v2.6",
+      "alocr_en_v2_0": "英語 AlOCR v2.0",
+      "alocr_en_v1_0": "英語 AlOCR v1.0"
+    },
+    "OcrModelVersionChinese": {
+      "name": "OCR 中国語モデルバージョン",
+      "help": "簡体中国語 OCR モデルのバージョンを選択します。auto は推奨の中国語 v6.1 モデルを使用します。この項目は cnocr/中国語モデルに適用されます。ncnn バックエンドでは無視されます。",
+      "auto": "自動推奨",
+      "cn_v6_1": "中国語 v6.1",
+      "cn_v6": "中国語 v6",
+      "ppocr_v6": "汎用 PP-OCRv6",
+      "alocr_cn_v3": "中国語 AlOCR v3",
+      "alocr_cn_v2_5": "中国語 AlOCR v2.5"
+    },
+    "OcrModelVersionJapanese": {
+      "name": "OCR 日本語モデルバージョン",
+      "help": "日本語 OCR モデルのバージョンを選択します。auto は日本語 Azur Lane v6 モデルを使用します。この項目は日本語モデルに適用されます。ncnn バックエンドでは無視されます。",
+      "auto": "自動推奨",
+      "azur_lane_jp_v6": "日本語 v6 (Azur Lane JP)",
+      "ppocr_v6": "汎用 PP-OCRv6"
+    },
+    "OcrModelVersionTraditionalChinese": {
+      "name": "OCR 繁体中国語モデルバージョン",
+      "help": "繁体中国語 OCR モデルのバージョンを選択します。現在は汎用 PP-OCRv6 のみ利用できます。今後のモデル追加のため、独立した設定として残しています。ncnn バックエンドでは無視されます。",
+      "auto": "自動推奨",
+      "ppocr_v6": "汎用 PP-OCRv6"
+    },
     "ScreenshotInterval": {
       "name": "スクリーンショット速度をX秒に1枚に減速",
       "help": "2回のスクリーンショット間の最小間隔。0.1～0.3に制限。高スペックPCでCPU使用率を低減できます。"
@@ -929,7 +973,7 @@
     },
     "TaskPriorityAdjustment": {
       "name": "タスクの優先度の調整",
-      "help": "既定の優先度参考（# 以降は説明です。実際の設定にはコメントをコピーしないでください）：\nRestart    # ゲーム再起動\n> OpsiCrossMonth    # セイレーン作戦の月跨ぎデイリー\n> Commission > Tactical > Research    # 委託 > 戦術学院 > 研究\n> Exercise    # 演習\n> Dorm > Meowfficer > Guild > Gacha    # 寮舎 > 指揮ニャ > 大艦隊 > デイリー建造\n> Reward    # 報酬受取\n> ShopFrequent > ShopOnce > Shipyard > Freebies    # 通常ショップ > 一回限りショップ > 開発ドック > 無料報酬\n> PrivateQuarters    # プライベートルーム\n> OpsiExplore    # セイレーン作戦の月次開拓\n> Minigame > Awaken    # ミニゲーム > 認知覚醒\n> OpsiAshBeacon    # METAビーコン戦\n> OpsiDaily > OpsiShop > OpsiVoucher > EventShop    # セイレーン作戦デイリー > 港ショップ > 交換ショップ > イベントショップ\n> OpsiAbyssal > OpsiStronghold > OpsiObscure > OpsiArchive    # 深淵海域 > セイレーン要塞 > 隠された海域 > アーカイブ座標\n> Daily > Hard > OpsiAshBeacon > OpsiAshAssist > OpsiMonthBoss    # デイリーチャレンジ > ハード海域 > META戦 > META支援 > 月度ボス\n> Sos > EventSp > EventA > EventB > EventC > EventD    # SOS > イベントデイリーSP > イベントデイリーA > イベントデイリーB > イベントデイリーC > イベントデイリーD\n> RaidDaily > CoalitionSp > WarArchives > MaritimeEscort    # 共闘デイリー > 共闘SP > 作戦アーカイブ > 商船護衛\n> IslandJuuEatery > IslandJuuCoffee > IslandGrill > IslandTeahouse > IslandRestaurant    # 島ジュウ簡餐 > ジュウコーヒー > イカ焼き > 白熊ドリンク > 有魚レストラン\n> IslandFarm > IslandRancher > IslandMineForest > IslandDailyGather > IslandManufacture    # 島農地 > 牧場 > 鉱山＆林場 > デイリー採集 > 製造業\n> IslandAirDrop > IslandBusiness > IslandDailyOrder > IslandDailyInteract > IslandPearlSell > IslandCargoPreparation    # 島デイリー補給 > 経営モジュール > デイリーオーダー > デイリー/週間任務 > 週間パール取引 > 貨物準備\n> Event > Event2 > Event3 > Raid > Hospital > HospitalEvent > Coalition > RaidScuttle > Main > Main2 > Main3    # イベントマップ1 > イベントマップ2 > イベントマップ3 > 共闘 > 病院 > 病院イベント > 連合 > 共闘沈船 > メイン > メイン2 > メイン3\n> OpsiMeowfficerFarming    # セイレーン作戦指揮ニャ収集\n> GemsFarming    # 緊急委託周回\n> Ambush11    # 1-1伏撃周回\n> OpsiHazard1Leveling    # 侵蝕1レベリング\n> ThreeOilLowCost    # 3燃料低コスト\n\n形式: 1 行にはタスク名だけを書き、`>` で優先度をつなぎます（左側ほど優先度が高い）。\n上記の `#` コメントは説明用です。実際の設定値にコメントを残すとタスク名の照合に失敗します。\nタスク名は英語の設定タスク名を使ってください。分からない場合は UI を英語に切り替えて確認してください。\n空欄にすると内蔵の既定優先度を使用します。"
+      "help": "タスク行をドラッグしてスケジューラの優先度を調整します。上にあるタスクほど先に実行されます。新しいタスクは内蔵の既定優先度に従って適切な位置へ自動的に挿入されます。"
     }
   },
   "OneClickRetire": {
@@ -1340,6 +1384,10 @@
       "fleet1_boss_fleet2_mob": "第一艦隊BOSS 第二艦隊道中",
       "fleet1_all_fleet2_standby": "第一艦隊全滅 第二艦隊待機",
       "fleet1_standby_fleet2_all": "第一艦隊待機 第二艦隊全滅"
+    },
+    "SkipPreparation": {
+      "name": "Fleet.SkipPreparation.name",
+      "help": "Fleet.SkipPreparation.help"
     }
   },
   "Submarine": {
@@ -1626,11 +1674,11 @@
       "name": "コンディション警告ポップアップを無視",
       "help": "有効にすると、コンディション警告ポップアップを強制的に突破します。完了後、前衛交換が有効な場合、艦船が強制的に交換されます。"
     },
-    "ALLowHighFlagshipLevel": {
+    "AllowHighFlagshipLevel": {
       "name": "満レベル後列のみ交換する",
       "help": "有効にすると、旗艦交換時にレベル100の白レア軽空母のみ選択されます。\n使用時はドックに条件を満たす艦船がいることを確認してください。"
     },
-    "ALLowLowVanguardLevel": {
+    "AllowLowVanguardLevel": {
       "name": "低レベル前衛の交換を許可する",
       "help": "有効にすると、前衛のレベル制限がレベル30以上に変更されます。ハードモード（CDマップなど）の場合はレベル70に変更されます。"
     },
@@ -1793,10 +1841,11 @@
     "Mode": {
       "name": "難易度",
       "help": "SPステージはイベントデイリーSPで実行する必要があります",
-      "easy": "easy",
-      "normal": "normal",
-      "hard": "hard",
-      "sp": "sp"
+      "tc1": "tc1",
+      "tc2": "tc2",
+      "tc3": "tc3",
+      "sp": "sp",
+      "ex": "ex"
     },
     "Fleet": {
       "name": "出撃艦隊",
@@ -1858,6 +1907,14 @@
     "DoMajorCommission": {
       "name": "主要委託を実行する（1200燃料/1000燃料委託）",
       "help": "1200燃料委託は現在では廃止されており、収益が非常に低いです。オフにすることをお勧めします。"
+    },
+    "CommissionNotifyReward": {
+      "name": "委託報酬プッシュ通知",
+      "help": "委託報酬獲得時に通知を送信（特にダイヤ報酬）"
+    },
+    "CommissionNotifyRewardStatistics": {
+      "name": "通知に統計情報を含める",
+      "help": "通知に今日/週間/月間の累積ダイヤ数を表示"
     }
   },
   "Tactical": {
@@ -1942,10 +1999,6 @@
       "only_no_project": "実行可能なプロジェクトがない場合",
       "do_not_use": "使用しない"
     },
-    "CubePreserve": {
-      "name": "X個のキューブを保持",
-      "help": "現在のキューブ数がこの値以下の場合、研究ではキューブを消費するプロジェクトを一時的に選択しません。\n0で無効。"
-    },
     "UseCoin": {
       "name": "資金を使用する",
       "help": "",
@@ -1966,10 +2019,21 @@
       "name": "資源不足時に科研を遅延させる",
       "help": "資源が不足している場合、AzurPilotは条件が満たされるか科研キューが空になりそうになるまで科研を遅延させますが、科研が停止することはありません。\n長期間資源が不足している場合やAzurPilotの実行時間が十分でない場合は、このオプションをオフにして科研キューを常に満杯に保つことができます。"
     },
+    "AllowGenreT": {
+      "name": "T型研究を許可",
+      "help": "T型研究は研究キューの停止や効率低下を招く可能性があります。必要な場合のみ有効にしてください。"
+    },
+    "RemainingCommissions": {
+      "name": "T型研究の残り委託回数",
+      "help": "保留中のT型研究に必要な残り委託回数です。-1は保留中のT型研究がないことを示します。"
+    },
     "PresetFilter": {
       "name": "科研フィルター",
       "help": "科研ドロップとプロジェクト更新については https://azur-stats.lyoko.io/ を参照してください。これらの基本を理解していない方はカスタムフィルターの作成をお勧めしません。プリセット科研フィルターの使用をお勧めします。",
       "custom": "カスタム",
+      "series_9_blueprint_ta152": "9期 図面+Ta152",
+      "series_9_blueprint_only": "9期 図面のみ",
+      "series_9_ta152_only": "9期 Ta152のみ",
       "series_8_blueprint_305": "8期 図面+305",
       "series_8_blueprint_only": "8期 図面のみ",
       "series_8_305_only": "8期 305のみ",
@@ -2922,6 +2986,10 @@
     "OpsiOnePushConfig": {
       "name": "セイレーン作戦プッシュ通知設定",
       "help": "「塞壬行動信息獨立推送」功能開啟時設置才生效。Onepushを使用して、侵食1と短毛猫に関する情報を1つプッシュします。設定方法はドキュメントを参照してください：https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/Onepush-configuration-%5BCN%5D"
+    },
+    "AutoSearchTimeLimit": {
+      "name": "自動探索時間制限",
+      "help": "単位：分。自動探索中にイベントが一定時間発生しない場合、フリーズと判定されます。"
     }
   },
   "OpsiAshBeacon": {
@@ -3001,6 +3069,10 @@
     "LastZone": {
       "name": "最後に完了した海域",
       "help": "自動的に更新される値。進行状況をリセットするには0を入力します。リセット後は開放済み海域は自動でスキップされます。\n海域ID、中国サーバー/グローバルサーバー/日本サーバー/台湾サーバーの海域名をサポート（例：「51」「NA Ocean SE Sector E」など）"
+    },
+    "AllowHazard1Leveling": {
+      "name": "探索中の侵食1レベリングを許可",
+      "help": "有効にすると、侵食1レベリング任務を延期しなくなります。行動力が足りなくなってエリア開拓ができなくなる恐れがあるため、慎重に使用してください。"
     },
     "ExploreProgress": {
       "name": "月間開拓進捗",
@@ -3141,10 +3213,6 @@
       "name": "行動力をXポイント保留",
       "help": "行動力がX以下になると停止し、行動力ボックスを自動で開きます。\nこの値はセイレーン作戦リセット3日前に自動的に200ポイントに減ります。侵食1レベリングが有効な場合は1000ポイントに変更され、最終日には自動的に0ポイントに減ります。"
     },
-    "SmartNaturalAPCleanup": {
-      "name": "スマートスケジュール自然行動力消化",
-      "help": "スマートスケジュールが自然回復した行動力を消化するために短猫を起動するときに使う一時的な非表示フラグ。"
-    },
     "HazardLevel": {
       "name": "侵食レベル",
       "help": "指定した侵食レベルの海域を時計回りに攻撃します。\n指揮ニャポイント/行動力の比率が高い5または3を選択するのがおすすめです。",
@@ -3223,10 +3291,6 @@
     "RecordNonCL1AP": {
       "name": "統計非侵食 1 ソース体力",
       "help": "オンにすると、すべてのソース（明石店での購入など）のスタミナ獲得データがカウントされます。オフにすると侵食1レベリングタスクのみ体力データがカウントされ、他のタスクや手動操作で得た体力は無視されます。"
-    },
-    "PreserveVirtualAsset": {
-      "name": "X ポイントの仮想資産を保持",
-      "help": "仮想資産 = モビリティ × 1700/30 + 黄色のコイン + (月末までの時間/10分) × 1700/30\n仮想資産が X 未満の場合、黄色のコイン補給タスクが実行されます。0 は無制限を意味します。"
     },
     "RecordSeaMiles": {
       "name": "海里数記録",
@@ -3335,16 +3399,6 @@
       "name": "ショートキャットは X ポイントの可動性を接続して保持します",
       "help": "モビリティがX以下になると停止し、モビリティボックスが自動的に開きます。"
     },
-    "ActionPointEarlyTriggerEnable": {
-      "name": "行動力の早期スケジュール",
-      "help": "侵食 1 または指揮ニャ周回の終了時に自然回復分の行動力を記録し、10 分ごとに 1 回復する速度でスマートスケジュールの次回実行時刻を計算して、行動力あふれを防ぎます。",
-      "True": "有効",
-      "False": "無効"
-    },
-    "ActionPointEarlyTriggerThreshold": {
-      "name": "早期スケジュール行動力しきい値",
-      "help": "自然回復分の行動力が X まで回復したらスマートスケジュールを再実行します。既定値は 200 で、自然上限付近で侵食 1 または指揮ニャ周回を選び直す用途に向いています。"
-    },
     "OperationCoinsReturnThreshold": {
       "name": "X 個の戦闘物資引換券を入手する",
       "help": "黄色のコイン獲得ミッション中に、戦闘補給券を合計 X 枚獲得 (増加) し、レベルを上げるために侵食 1 に戻ります。"
@@ -3373,20 +3427,30 @@
       "True": "有効",
       "False": "無効"
     },
-    "MeowStartEarlyMode": {
-      "name": "月末モビリティ自動掃除モード",
-      "help": "アグレッシブモード (×0.8): 前進が少なく、アクションパワーを節約しますが、リフレッシュを逃す可能性があります。バランスモード (×1.2): 通常前進、安全性と効率のバランス。保守モード（×1.5）：より前進、安全を優先しますが、行動力を無駄にする可能性があります",
-      "aggressive": "アグレッシブモード",
-      "balanced": "平衡モード",
-      "conservative": "保守的モード"
+    "TaskPriority": {
+      "name": "作戦コイン補充優先度",
+      "help": "作戦コイン（黄）が不足している場合、作戦コイン補充任務の実行優先順位。> で区切ります。"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "行動力溢れ防止",
+      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します\nスマートスケジューリングを選択した場合、行動力と作戦補給コインがどちらも不足して実行可能な任務がない時は、指揮ニャ周回を実行して現在行動力を消費します"
     },
-    "MeowStartEarlyEnable": {
-      "name": "月末にモビリティの自動クリーンアップを有効にする",
-      "help": "過去の AP 消費率に基づいて、月末に過剰なモビリティをクリーンアップするためにショート キャット タスクを事前に開始する必要があるかどうかを自動的に判断します。"
+    "Task": {
+      "name": "実行する任務",
+      "help": "専用処理があるスマートスケジューリングを推奨します",
+      "OpsiScheduling": "スマートスケジューリング（推奨）",
+      "OpsiHazard1Leveling": "侵蝕1レベリング",
+      "OpsiMeowfficerFarming": "指揮ニャ周回"
     },
-    "VirtualAssetPreserve": {
-      "name": "侵食1レベル X ポイント仮想資産を保持",
-      "help": "仮想資産 = モビリティ × 1700/30 + 黄色のコイン + (月末までの時間/10分) × 1700/30。仮想資産が X 未満の場合、黄色のコイン補給タスクが実行されます。"
+    "ActionPointUpperbound": {
+      "name": "現在行動力上限",
+      "help": "現在行動力がこの値に達した時、セイレーン作戦任務を開始します"
+    },
+    "ActionPointLowerbound": {
+      "name": "現在行動力下限",
+      "help": "現在行動力がこの値を下回るまで実行を続けます"
     }
   },
   "IslandPlan": {
@@ -5539,6 +5603,46 @@
       "help": ""
     }
   },
+  "AutoEquip": {
+    "_info": {
+      "name": "自動装備",
+      "help": "現在の骨組み: ドック、先頭艦、クイック変更、装備中フィルター、仮の装備ロジック、次の艦。"
+    },
+    "ShipLimit": {
+      "name": "処理する艦船数の上限",
+      "help": "0 は次の艦船が見つからなくなるまで処理します。デバッグ時は 1 など小さい値を指定してください。"
+    },
+    "EnableSlot1": {
+      "name": "装備スロット 1 を交換",
+      "help": "有効な場合、第 1 装備スロットが空のときだけ自動装備を試みます。",
+      "True": "True",
+      "False": "False"
+    },
+    "EnableSlot2": {
+      "name": "装備スロット 2 を交換",
+      "help": "有効な場合、第 2 装備スロットが空のときだけ自動装備を試みます。",
+      "True": "True",
+      "False": "False"
+    },
+    "EnableSlot3": {
+      "name": "装備スロット 3 を交換",
+      "help": "有効な場合、第 3 装備スロットが空のときだけ自動装備を試みます。",
+      "True": "True",
+      "False": "False"
+    },
+    "EnableSlot4": {
+      "name": "装備スロット 4 を交換",
+      "help": "有効な場合、第 4 装備スロットが空のときだけ自動装備を試みます。",
+      "True": "True",
+      "False": "False"
+    },
+    "EnableSlot5": {
+      "name": "装備スロット 5 を交換",
+      "help": "有効な場合、第 5 装備スロットが空のときだけ自動装備を試みます。",
+      "True": "True",
+      "False": "False"
+    }
+  },
   "Benchmark": {
     "_info": {
       "name": "パフォーマンステスト",
@@ -5841,10 +5945,32 @@
       "InvalidChar": "構成ファイル名には次の文字を含めることはできません: .\\/:*?\"<>|",
       "InvalidPrefixTemplate": "構成ファイル名をテンプレートで始めることはできません",
       "Back": "戻る",
-      "New": "に追加",
-      "Import": "輸入",
+      "New": "設定を追加",
+      "Import": "設定をインポート",
+      "ImportLegacy": "旧データをインポート",
+      "ImportLegacyTitle": "旧 AzurPilot/ALAS データをインポート",
+      "ImportLegacyHint": "旧 AzurPilot/ALAS のルートフォルダーを選択すると、次のデータが自動的にインポートされます。",
+      "ImportLegacyContent": "設定ファイル、データベース、ログ統計",
+      "ImportLegacyWarning": "同名のファイルは上書きされます。先に現在のプロジェクトをバックアップしてください。",
+      "ImportLegacyChoose": "旧 AzurPilot/ALAS フォルダーを選択",
+      "ImportLegacySelecting": "表示されたダイアログで旧 AzurPilot/ALAS のルートフォルダーを選択してください",
+      "ImportLegacySuccess": "旧データをインポートしました",
+      "ImportLegacyFailed": "旧データのインポートに失敗しました: {error}",
+      "ImportLegacyNoMatch": "選択したフォルダーの config/ または log/cl1/ に一致するファイルが見つかりませんでした",
+      "ImportLegacyRequestFailed": "アップロード要求に失敗しました",
+      "ImportLegacyUnknownError": "不明なエラー",
       "Export": "輸出",
       "Delete": "消去",
+      "Summary": "概要",
+      "Collapse": "折りたたむ",
+      "EnabledTasks": "有効なタスク",
+      "SchedulerOrderHint": "スケジューラーの優先順位で表示しています。実際の実行時刻は各タスクの NextRun によって決まります。",
+      "SummaryLoadFailed": "設定の概要を読み込めませんでした: {error}",
+      "DeleteConfirm": "設定「{name}」を削除しますか？この操作は元に戻せませんが、ログと統計データは削除されません。",
+      "DeleteRunning": "設定「{name}」は実行中です。停止してから削除してください。",
+      "DeleteLast": "設定は少なくとも1つ残す必要があります。先に別の設定を追加してください。",
+      "DeleteSuccess": "設定「{name}」を削除しました",
+      "DeleteFailed": "設定の削除に失敗しました: {error}",
       "OverrideWarning": "既存の設定ファイルは上書きされます",
       "ImportSuccess": "インポート成功",
       "NewSuccess": "正常に追加されました",
@@ -5876,6 +6002,12 @@
       "NotRunning": "実行されていない、サーバーへの接続が失われた、またはサーバーがオフラインになっています",
       "NotEnable": "有効になっていません。deploy.yaml で webui パスワードを設定し、リモート コントロールを有効にしてください",
       "EntryPoint": "リモートアクセスURLアドレス:",
+      "StatusDirect": "P2P 直結",
+      "StatusTurn": "TURN リレー",
+      "StatusSsh": "SSH 転送",
+      "StatusSignaling": "P2P 接続待機中",
+      "StatusStarting": "接続中",
+      "StatusFailed": "接続失敗",
       "ConfigureHint": "構成チュートリアル:",
       "SSHNotInstall": "システムに ssh ツールがありません。チュートリアルを参照して ssh をダウンロードまたはインストールしてください。"
     },
@@ -5957,12 +6089,26 @@
       "DiscordRichPresenceHelp": "AzurPilot の実行状態を Discord に表示します。",
       "EnableRemoteAccess": "リモートアクセスを有効化",
       "EnableRemoteAccessHelp": "SSH リバーストンネルで WebUI を公開します。公開前に必ずパスワードを設定してください。",
+      "RemoteAccessMode": "リモートアクセスモード",
+      "RemoteAccessModeHelp": "auto は P2P/TURN を優先して SSH に戻します。webrtc は P2P 優先、ssh は従来の SSH 転送のみです。",
       "SSHUser": "SSH ユーザー",
       "SSHUserHelp": "リモートアクセス用のログインユーザー名です。空欄なら起動時に生成されます。",
       "SSHServer": "SSH サーバー",
       "SSHServerHelp": "リモートアクセス用サーバーです。形式は host:port です。",
       "SSHExecutable": "SSH 実行ファイル",
       "SSHExecutableHelp": "ssh.exe のパスです。空欄または ssh で PATH から探します。",
+      "AllowedRedirectHosts": "許可するリダイレクトホスト",
+      "AllowedRedirectHostsHelp": "SSH スケジューリングリダイレクトで信頼する宛先ホストです。JSON 配列またはカンマ区切りで指定します。空の場合は SSHServer と同じドメインおよび親ドメインのワイルドカードを許可します。",
+      "MaxRedirects": "最大リダイレクト回数",
+      "MaxRedirectsHelp": "1 回のリモートアクセス起動で追従する SSH スケジューリングリダイレクトの最大回数です。",
+      "SignalingServer": "WebRTC シグナリングサーバー",
+      "SignalingServerHelp": "空の場合は SSHServer から wss://host/signal を推定します。",
+      "StunServers": "STUN サーバー",
+      "StunServersHelp": "NAT 越え用の JSON 配列またはカンマ区切り文字列。",
+      "TurnServers": "TURN サーバー",
+      "TurnServersHelp": "P2P 失敗時のリレー用 JSON 配列またはカンマ区切り文字列。",
+      "TurnCredentialMode": "TURN 認証情報モード",
+      "TurnCredentialModeHelp": "現在は static をサポートします。ephemeral は短期認証情報用の予約値です。",
       "WebuiHost": "WebUI 待受アドレス",
       "WebuiHostHelp": "WebUI が待ち受けるホストです。例: 0.0.0.0、127.0.0.1、::。",
       "WebuiPort": "WebUI ポート",
@@ -6062,13 +6208,6 @@
       "AvgMeowRoundTime": "平均短猫ラウンド時間",
       "MeowLootTitle": "短猫収穫",
       "NoMeowDataNotice": "短猫収穫データがありません。1回実行後に自動生成されます",
-      "MeowAdvanceAdviceTitle": "短猫早め開始アドバイス",
-      "CurrentAP": "現在のAP: {value}",
-      "ApPerRound": "1ラウンド消費: {value} AP",
-      "AvailableRounds": "実行可能ラウンド数: {value}{unit}",
-      "AvgRoundDuration": "平均ラウンド時間: {value}{unit}",
-      "CurrentMode": "現在のモード: {value}",
-      "RecommendAhead": "推奨早め開始: {value}{unit}",
       "RoundUnit": " ラウンド",
       "SecondUnit": "秒",
       "HourUnit": "時間",
@@ -6091,9 +6230,6 @@
       "TargetExpRequired": "目標レベルに必要な経験値",
       "BattlesCompleted": "完了戦闘数",
       "ExpRemaining": "残り必要経験値",
-      "StartCleanupTime": "推奨クリーンアップ開始: {value}",
-      "NextOsReset": "次回大世界リセット: {value}",
-      "MeowAutoCleanupStatus": "自動先行クリーンアップ: {value}",
       "CommissionIncomeTitle": "委託収益統計",
       "CommissionIncomeMonth": "今月",
       "CommissionIncomeWeek": "今週",
@@ -6122,14 +6258,12 @@
       "UseSmartSchedulingOperationCoinsPreserve": "スマートスケジューリング作戦コイン保留",
       "OperationCoinsPreserve": "作戦コイン保留",
       "ActionPointPreserve": "行動力保留",
-      "ActionPointEarlyTriggerEnable": "行動力の早期スケジュール",
-      "ActionPointEarlyTriggerThreshold": "早期スケジュール行動力しきい値",
       "OperationCoinsReturnThreshold": "作戦コイン戻り閾値",
       "EnableMeowfficerFarming": "指揮ニャー収集を有効",
       "EnableObscure": "隠秘海域を有効",
       "EnableAbyssal": "深淵海域を有効",
       "EnableStronghold": "セイレーン要塞を有効",
-      "MeowStartEarlyMode": "短猫早期開始モード"
+      "TaskPriority": "任務優先度"
     },
     "Misc": {
       "Enabled": "有効",

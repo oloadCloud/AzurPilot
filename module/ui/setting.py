@@ -45,6 +45,8 @@ class Setting:
         if isinstance(option_buttons, ButtonGrid):
             option_buttons = option_buttons.buttons
         for option, option_name in zip(option_buttons, option_names):
+            if option_name == 'not_available':
+                continue
             self.settings[(setting, option_name)] = option
 
         if option_default not in option_names:
@@ -144,7 +146,7 @@ class Setting:
                 self.main.device.screenshot()
 
             if timeout.reached():
-                logger.warning(f'设置 {self.name} 选项超时，假定当前选项已正确。')
+                logger.warning(f'[UI] 设置 {self.name} 选项超时，假定当前选项已正确。')
                 return False
 
             self.show_active_buttons()

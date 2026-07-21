@@ -56,24 +56,30 @@ class ConnectionAttr:
         """
         url = platform_tools_url()
         if url is None:
-            logger.warning(f'当前平台不支持自动下载 ADB: {sys.platform}')
+            logger.warning(f'[Device] 当前平台不支持自动下载 ADB: {sys.platform}')
+            return None
+
+        if not target:
+            logger.warning('[Device] ADB 下载失败，目标路径为空')
             return None
 
         target = Path(target).resolve()
-        root = Path.cwd().resolve()
-        tools_dir = root / '.venv' / 'platform-tools'
-        archive = root / '.venv' / 'platform-tools.zip'
+        download_dir = target.parent
+        if target.parent.name in ['Scripts', 'bin'] and target.parent.parent.name == '.venv':
+            download_dir = target.parent.parent
+        tools_dir = download_dir / 'platform-tools'
+        archive = download_dir / 'platform-tools.zip'
         executable = 'adb.exe' if os.name == 'nt' else 'adb'
         source = tools_dir / executable
 
         logger.hr('Download ADB', level=2)
-        logger.warning(f'未找到 ADB，正在下载 Android platform-tools: {url}')
+        logger.warning(f'[Device] 未找到 ADB，正在下载 Android platform-tools: {url}')
         tools_dir.parent.mkdir(parents=True, exist_ok=True)
         try:
             urllib.request.urlretrieve(url, archive)
         except Exception as e:
             archive.unlink(missing_ok=True)
-            logger.warning(f'ADB 下载失败: {e}')
+            logger.warning(f'[Device] ADB 下载失败: {e}')
             return None
 
         if tools_dir.exists():
@@ -85,7 +91,7 @@ class ConnectionAttr:
             archive.unlink(missing_ok=True)
 
         if not source.exists():
-            logger.warning(f'ADB 下载失败，未找到 {source}')
+            logger.warning(f'[Device] ADB 下载失败，未找到 {source}')
             return None
 
         if os.name != 'nt':
@@ -101,7 +107,7 @@ class ConnectionAttr:
         else:
             target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-        logger.info(f'ADB 已安装: {target}')
+        logger.info(f'[Device] ADB 已安装: {target}')
         return str(target).replace('\\\\', '/').replace('\\', '/')
 
     def __init__(self, config):
@@ -387,9 +393,9 @@ class ConnectionAttr:
         # deploy.yaml 中的路径是相对于项目根目录的
         deploy_adb = State.deploy_config.AdbExecutable
         root = State.deploy_config.root_filepath
-        file = os.path.abspath(os.path.join(root, deploy_adb)).replace('\\', '/')
-        if os.path.exists(file):
-            return file
+        deploy_adb_file = os.path.abspath(os.path.join(root, deploy_adb)).replace('\\', '/')
+        if os.path.exists(deploy_adb_file):
+            return deploy_adb_file
 
         # Try existing adb.exe in predefined list
         for candidate in self.adb_binary_list:
@@ -407,13 +413,13 @@ class ConnectionAttr:
             return file
 
         # Use adb in system PATH
-        file = shutil.which('adb')
-        if file:
-            return os.path.abspath(file).replace('\\', '/')
+        path_adb = shutil.which('adb')
+        if path_adb:
+            return os.path.abspath(path_adb).replace('\\', '/')
 
         # Download adb only when all local candidates are missing
         # 使用绝对路径下载，确保后续实例能找到文件
-        downloaded = self.download_adb_binary(file)
+        downloaded = self.download_adb_binary(deploy_adb_file)
         if downloaded:
             return downloaded
 

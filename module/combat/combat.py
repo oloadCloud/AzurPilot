@@ -81,7 +81,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             logger.attr('Loading', f'{int(loading * 100)}%')
             return True
         if self.is_combat_executing():
-            logger.warning('检测到战斗状态但未检测到加载条')
+            logger.warning('[战斗] 检测到战斗状态但未检测到加载条')
             return True
         return False
 
@@ -146,6 +146,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return PAUSE_GildedReverie
         if PAUSE_AzureCore.match_template_color(self.device.image, offset=(10, 10)):
             return PAUSE_AzureCore
+        if PAUSE_Nier.match_template_color(self.device.image, offset=(10, 10)):
+            return PAUSE_Nier
         return False
 
     def handle_combat_quit(self, offset=(20, 20), interval=3):
@@ -215,6 +217,10 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True
         if QUIT_GildedReverie.match_luma(self.device.image, offset=offset):
             self.device.click(QUIT_GildedReverie)
+            timer.reset()
+            return True
+        if QUIT_Nier.match_luma(self.device.image, offset=offset):
+            self.device.click(QUIT_Nier)
             timer.reset()
             return True
         return False

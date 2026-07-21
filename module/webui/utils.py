@@ -14,6 +14,7 @@ from queue import Queue
 from typing import Callable, Generator, List
 
 import pywebio
+from pywebio.exceptions import SessionClosedException
 from pywebio.input import PASSWORD, actions, input, input_group
 from pywebio.output import PopupSize, popup, put_html, put_text, toast
 from pywebio.session import eval_js, info as session_info, register_thread, run_js
@@ -228,6 +229,9 @@ class TaskHandler:
                         # logger.debug(f'Start task {task.g.__name__}')
                         task.send(self)
                         # logger.debug(f'End task {task.g.__name__}')
+                    except SessionClosedException:
+                        logger.debug(f"WebIO 会话已关闭，停止任务 {task.name}")
+                        self.remove_task(task, nowait=True)
                     except Exception as e:
                         logger.exception(e)
                         self.remove_task(task, nowait=True)
@@ -267,9 +271,9 @@ class TaskHandler:
             if not self._thread.is_alive():
                 logger.info("Finish task handler")
             else:
-                logger.warning("任务处理器未在 2 秒内停止")
+                logger.warning("[WebUI] 任务处理器未在 2 秒内停止")
         else:
-            logger.info("任务处理器在其自身线程内调用了停止，跳过 join")
+            logger.info("[WebUI] 任务处理器在其自身线程内调用了停止，跳过 join")
 
 
 class WebIOTaskHandler(TaskHandler):
@@ -414,6 +418,30 @@ def add_css(filepath):
     run_js(js)
 
 
+def load_webui_styles(theme=None, is_mobile=None):
+    """加载 WebUI 各入口共用的基础、响应式与主题样式。"""
+    if theme is None:
+        theme = State.theme or "default"
+    if is_mobile is None:
+        is_mobile = session_info.user_agent.is_mobile
+
+    styles = [
+        "alas",
+        "alas-mobile" if is_mobile else "alas-pc",
+        "entry-alas",
+    ]
+    theme_styles = {
+        "dark": "dark-alas",
+        "socialism": "socialism-alas",
+        "children": "children-alas",
+        "apple": "apple-alas",
+    }
+    styles.append(theme_styles.get(theme, "light-alas"))
+
+    for name in styles:
+        add_css(filepath_css(name))
+
+
 def _read(path):
     with open(path, "r") as f:
         return f.read()
@@ -467,6 +495,9 @@ def parse_pin_value(val, valuetype: str = None, widget_type: str = None, options
     checkbox 返回 [] 或 [True]（在 put_checkbox_ 中定义）；
     multiselect 返回选项值列表（如 [3, 1, 5]）。
     """
+    if widget_type == 'task_priority':
+        return "" if val is None else str(val)
+
     # 处理 dict 类型 - 提取 'value' 字段并递归解析
     if isinstance(val, dict):
         if 'value' in val:
@@ -544,24 +575,49 @@ def _show_password_help(action):
 
 
 def _input_webui_password():
-    while True:
-        data = input_group(inputs=[
-            input(
-                name="password",
-                label="请输入 WebUI 密码",
-                type=PASSWORD,
-                placeholder="PASSWORD",
-            ),
-            actions(name="action", buttons=[
-                {"label": "登录", "value": "login", "type": "submit", "color": "primary"},
-                {"label": "没设置过密码？", "value": "new", "type": "submit", "color": "secondary"},
-                {"label": "忘记密码？", "value": "forgot", "type": "submit", "color": "secondary"},
-            ]),
-        ])
-        action = data["action"]
-        if action == "login":
-            return data["password"]
-        _show_password_help(action)
+    eval_js("(document.body.classList.add('alas-login-page'), true)")
+    try:
+        while True:
+            data = input_group(
+                label="AzurPilot",
+                inputs=[
+                    input(
+                        name="password",
+                        label="请输入 WebUI 密码",
+                        type=PASSWORD,
+                        placeholder="PASSWORD",
+                    ),
+                    actions(
+                        name="action",
+                        buttons=[
+                            {
+                                "label": "登录",
+                                "value": "login",
+                                "type": "submit",
+                                "color": "primary",
+                            },
+                            {
+                                "label": "没设置过密码？",
+                                "value": "new",
+                                "type": "submit",
+                                "color": "secondary",
+                            },
+                            {
+                                "label": "忘记密码？",
+                                "value": "forgot",
+                                "type": "submit",
+                                "color": "secondary",
+                            },
+                        ],
+                    ),
+                ],
+            )
+            action = data["action"]
+            if action == "login":
+                return data["password"]
+            _show_password_help(action)
+    finally:
+        run_js("document.body.classList.remove('alas-login-page')")
 
 
 def login(password):

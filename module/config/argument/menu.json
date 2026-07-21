@@ -99,6 +99,7 @@
       "OpsiMeowfficerFarming",
       "OpsiHazard1Leveling",
       "OpsiScheduling",
+      "OpsiPreventActionPointOverflow",
       "OpsiCrossMonth",
       "OpsiSimulator"
     ]
@@ -134,6 +135,7 @@
       "OpsiDaemon",
       "EventStory",
       "BoxDisassemble",
+      "AutoEquip",
       "Benchmark",
       "OcrBenchmark",
       "AzurLaneUncensored",
