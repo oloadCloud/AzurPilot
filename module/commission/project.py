@@ -149,10 +149,13 @@ class Commission:
             self.duration_hm = str(self.duration).rsplit(':', 1)[0]
             
             suffix_map = {
-                'Ⅰ': 'i', 'Ⅱ': 'ii', 'Ⅲ': 'iii', 'Ⅳ': 'iv', 'Ⅴ': 'v', 'Ⅵ': 'vi'
+                'Ⅰ': 'i', 'Ⅱ': 'ii', 'Ⅲ': 'iii', 'Ⅳ': 'iv', 'Ⅴ': 'v', 'Ⅵ': 'vi',
+                'I': 'i', 'II': 'ii', 'III': 'iii', 'IV': 'iv', 'V': 'v', 'VI': 'vi'
             }
-            if hasattr(self, 'suffix') and self.suffix:
-                self.suffix_str = suffix_map.get(self.suffix.strip(), 'unknown')
+            import re
+            match = re.search(r'(Ⅵ|Ⅳ|Ⅴ|Ⅲ|Ⅱ|Ⅰ|VI|IV|V|III|II|I)\s*$', self.name.upper())
+            if match:
+                self.suffix_str = suffix_map.get(match.group(1), 'unknown')
 
     @Config.when(SERVER='en')
     def commission_parse(self):

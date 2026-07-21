@@ -435,6 +435,7 @@ def load_webui_styles(theme=None, is_mobile=None):
         "socialism": "socialism-alas",
         "children": "children-alas",
         "apple": "apple-alas",
+        "fluent": "fluent-alas", 
     }
     styles.append(theme_styles.get(theme, "light-alas"))
 
