@@ -152,7 +152,6 @@ class Commission:
                 'Ⅰ': 'i', 'Ⅱ': 'ii', 'Ⅲ': 'iii', 'Ⅳ': 'iv', 'Ⅴ': 'v', 'Ⅵ': 'vi',
                 'I': 'i', 'II': 'ii', 'III': 'iii', 'IV': 'iv', 'V': 'v', 'VI': 'vi'
             }
-            import re
             match = re.search(r'(Ⅵ|Ⅳ|Ⅴ|Ⅲ|Ⅱ|Ⅰ|VI|IV|V|III|II|I)\s*$', self.name.upper())
             if match:
                 self.suffix_str = suffix_map.get(match.group(1), 'unknown')

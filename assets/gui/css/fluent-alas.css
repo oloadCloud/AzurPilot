@@ -113,8 +113,7 @@ p, span, div, label, li, td, th { color: inherit; }
   #pywebio-scope-log,
   .container-log,
   #pywebio-scope-groups > *:not(#pywebio-scope-navigator),
-  .launcher-setting-panel,
-  .deploy-setting-panel
+  #pywebio-scope-develop_detail
 ) {
   background-color: var(--fluent-card-bg) !important;
   backdrop-filter: blur(30px) saturate(125%) !important;
@@ -569,17 +568,8 @@ td, th {
   backdrop-filter: blur(10px) !important;
 }
 
-/* 启动面板：透明化避免嵌套双重卡片 */
-.startup-run-panel {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 8px 12px 8px 14px !important;
-  margin: 0 !important;
-}
-
 /* 文字颜色：统一面板内各级文字色值 */
-:is(.launcher-setting-title, .deploy-setting-title, .deploy-setting-group-title, .deploy-setting-field label, .startup-run-title) {
+:is(.launcher-setting-title, .alas-develop-section-title, .deploy-setting-group-title, .deploy-setting-field label, .startup-run-title) {
   color: var(--fluent-text) !important;
   font-weight: 700 !important;
 }
