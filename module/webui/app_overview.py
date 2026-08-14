@@ -6,6 +6,7 @@ from module.webui.app_dependencies import (
     RichLog,
     deep_iter,
     get_device_id,
+    get_localstorage,
     json,
     put_button,
     put_html,
@@ -13,6 +14,7 @@ from module.webui.app_dependencies import (
     put_scope,
     put_text,
     run_js,
+    set_localstorage,
     t,
     updater,
     use_scope,
@@ -161,6 +163,13 @@ class OverviewMixin(WebUIMixinBase):
         self._log = log
         self._log.dashboard_arg_group = LogRes(self.alas_config).groups
 
+        saved_state = get_localstorage("dashboard_display")
+        if saved_state is None:
+            default_state = True
+        else:
+            default_state = saved_state.lower() == "true"
+        self._log.set_dashboard_display(default_state)
+
         with use_scope("logs"):
             if "Maa" in self.ALAS_ARGS:
                 (
@@ -249,6 +258,7 @@ class OverviewMixin(WebUIMixinBase):
 
     def set_dashboard_display(self, b):
         self._log.set_dashboard_display(b)
+        set_localstorage("dashboard_display", str(b).lower())
         self.alas_update_dashboard(True)
 
     @use_scope("content", clear=True)

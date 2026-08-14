@@ -366,6 +366,7 @@ class AppShellMixin(WebUIMixinBase):
             "default",
             "dark",
             "light",
+            "fluent",
             "advanced_material",
             "dark_advanced_material",
         ):

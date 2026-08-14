@@ -93,6 +93,25 @@ class ActionPointToolbarMixin(WebUIMixinBase):
                     "refresh_text": "#93c5fd",
                 }
             )
+        elif self.theme == "fluent":
+            md3_colors.update(
+                {
+                    "toolbar_border": "rgba(255, 255, 255, 0.08)",
+                    "toolbar_bg": "rgba(32, 32, 32, 0.9)",
+                    "toolbar_shadow": "0 8px 16px rgba(0, 0, 0, 0.4)",
+                    "segment_border": "rgba(255, 255, 255, 0.12)",
+                    "segment_divider": "rgba(255, 255, 255, 0.08)",
+                    "segment_outline": "rgba(255, 255, 255, 0.05)",
+                    "segment_bg": "rgba(24, 24, 24, 0.8)",
+                    "text": "#ffffff",
+                    "label": "#cccccc",
+                    "hover": "rgba(255, 255, 255, 0.08)",
+                    "selected_bg": "rgba(96, 205, 255, 0.15)",
+                    "selected_text": "#60cdff",
+                    "selected_outline": "#60cdff",
+                    "refresh_text": "#60cdff",
+                }
+            )
         put_html(f"""
         <style>
         [style*="--ap-chart-md3-toolbar-{chart_id}"] {{

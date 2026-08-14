@@ -82,6 +82,7 @@ class HomeMixin(WebUIMixinBase):
                 [
                     {"label": "Light", "value": "default", "color": "light"},
                     {"label": "Dark", "value": "dark", "color": "dark"},
+                    {"label": "Fluent", "value": "fluent", "color": "primary"},
                     {
                         "label": "高级材质",
                         "value": "advanced_material",
