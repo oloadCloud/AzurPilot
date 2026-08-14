@@ -1,3 +1,20 @@
+"""
+岛屿农场（Island Farm）自动化管理模块。
+
+负责岛屿系统中农场、果园、苗圃三大生产区域的自动化管理，包括：
+- 仓库库存检查与低库存作物识别
+- 空闲岗位检测与自动播种
+- 作物选择策略：优先补种低于阈值的作物，其次种植默认作物
+- 工人派遣与角色筛选（含小天城橡胶树优先机制）
+- 季节限定作物的智能过滤
+- 种子不足时自动从商店购买
+
+管理的生产区域：
+- 农场（farm）：小麦、玉米、水稻、白菜、土豆、大豆、牧草、咖啡豆
+- 果园（orchard）：苹果、柑橘、香蕉、芒果、柠檬、牛油果、橡胶
+  （秋季限定：秋月梨、柿子，4x1 种植——每次派遣只消耗 4 颗种子）
+- 苗圃（nursery）：胡萝卜、洋葱、亚麻、草莓、棉花、茶叶、薰衣草、菠萝、芦笋
+"""
 from module.island_farm.assets import *
 from module.island.island import *
 from datetime import timedelta
@@ -8,6 +25,36 @@ from module.logger import logger
 
 
 class IslandFarm(Island, WarehouseOCR, LoginHandler):
+    """
+    岛屿农场自动化管理器。
+
+    继承 Island（岛屿基础操作）、WarehouseOCR（仓库 OCR 识别）和
+    LoginHandler（登录处理），实现农场、果园、苗圃的全自动管理。
+
+    执行流程：
+    1. 进入岛屿并检查仓库库存，识别低库存作物
+    2. 进入岗位管理页面，遍历所有岗位检测状态
+    3. 对空闲岗位执行播种（优先补种低库存作物，其次默认作物）
+    4. 计算下次运行时间（取所有岗位完成时间和 6 小时后的最小值）
+
+    Attributes:
+        season_config: 季节配置对象，用于季节限定作物过滤。
+        farm_positions (int): 农场岗位数量。
+        orchard_positions (int): 果园岗位数量。
+        nursery_positions (int): 苗圃岗位数量。
+        farm_threshold (int): 农场作物库存最低阈值。
+        orchard_threshold (int): 果园作物库存最低阈值。
+        nursery_threshold (int): 苗圃作物库存最低阈值。
+        worker_filters (dict): 各区域的工人派遣角色筛选器。
+        ignore_avocado (bool): 是否忽略牛油果。
+        ignore_pineapple (bool): 是否忽略菠萝。
+        plant_config (dict): 各区域的默认作物种植配置。
+        INVENTORY_CONFIG (dict): 各区域的仓库物品配置（模板、选择按钮、种子数量等）。
+        posts (dict): 岗位信息字典，包含按钮和当前种植作物。
+        to_plant_lists (dict): 各区域需要补种的作物列表。
+        name_to_config (dict): 作物名称到配置项的映射。
+        inventory_counts (dict): 各区域的仓库库存统计。
+    """
     def __init__(self, *args, **kwargs):
         Island.__init__(self, *args, **kwargs)
         WarehouseOCR.__init__(self)
@@ -120,6 +167,16 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
                      'selection': SELECT_RUBBER, 'selection_check': SELECT_RUBBER_CHECK,
                      'post_action': POST_RUBBER, 'category': 'orchard', 'seed_number': 16,
                      'shop': SHOP_SEED_RUBBER},
+                    # 秋季限定（坠香果园）：秋月梨、柿子
+                    # 4x1 种植：每次派遣只消耗 4 颗种子（果园其他作物每单至少 4x4=16 颗）
+                    {'name': 'pear', 'template': TEMPLATE_PEAR, 'var_name': 'pear',
+                     'selection': SELECT_PEAR, 'selection_check': SELECT_PEAR_CHECK,
+                     'post_action': POST_PEAR, 'category': 'orchard', 'seed_number': 4,
+                     'batch_4x1': True, 'shop': SHOP_SEED_PEAR},
+                    {'name': 'persimmon', 'template': TEMPLATE_PERSIMMON, 'var_name': 'persimmon',
+                     'selection': SELECT_PERSIMMON, 'selection_check': SELECT_PERSIMMON_CHECK,
+                     'post_action': POST_PERSIMMON, 'category': 'orchard', 'seed_number': 4,
+                     'batch_4x1': True, 'shop': SHOP_SEED_PERSIMMON},
                 ]
             },
             'nursery': {
@@ -198,7 +255,7 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         }
 
     def check_inventory_and_prepare_lists(self):
-        """检查库存并准备需要补种的列表"""
+        """检查库存并准备需要补种的列表（按库存升序，最少的优先）"""
         for category in ['farm', 'orchard', 'nursery']:
             inventory = self.warehouse_inventory(category)
             config = self.INVENTORY_CONFIG[category]
@@ -209,6 +266,11 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
                     continue
                 if category == 'nursery' and item_name == 'pineapple' and self.ignore_pineapple:
                     continue
+                # === 季节限定：不在当季的果园作物（如秋季的秋月梨/柿子）不列入补种计划 ===
+                if category == 'orchard' and hasattr(self, 'season_config'):
+                    if not self._is_orchard_crop_in_season(item_name):
+                        logger.info(f"[岛屿-农田] 跳过非当季果园作物: {item_name}")
+                        continue
                 # === 季节限定：不在当季的作物不列入补种计划 ===
                 if category == 'nursery' and hasattr(self, 'season_config'):
                     if not self._is_nursery_crop_in_season(item_name):
@@ -216,6 +278,29 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
                         continue
                 if count < threshold:
                     self.to_plant_lists[category].append(item_name)
+            # 库存最少的作物排最前，轮转分配时优先补种
+            self.to_plant_lists[category].sort(key=lambda name: inventory.get(name, 0))
+
+    def _is_orchard_crop_in_season(self, crop_name):
+        """
+        检查果园作物是否在当季（按季节配置）。
+
+        秋季的秋月梨/柿子属于果园季节限定作物（坠香果园），只在秋季补种；
+        非季节限定的果园作物（苹果、橡胶等）始终返回 True。
+        """
+        if not hasattr(self, 'season_config') or not self.season_config.is_seasonal_enabled:
+            return True
+        # 获取当前季节的 orchard 限定作物列表
+        seasonal_items = self.season_config.get_seasonal_items('orchard')
+        # 检查该作物是否是任何季节的限定品
+        from module.island.island_season import SEASONAL_ITEMS
+        for season_key in ['spring', 'summer', 'autumn', 'winter']:
+            other_items = SEASONAL_ITEMS.get(season_key, {}).get('orchard', [])
+            if crop_name in other_items:
+                # 该作物是季节限定品，检查是否在当季
+                return crop_name in seasonal_items
+        # 非季节限定作物，始终可用
+        return True
 
     def _is_nursery_crop_in_season(self, crop_name):
         """
@@ -237,7 +322,17 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         return True
 
     def warehouse_inventory(self, category):
-        """获取仓库库存信息"""
+        """
+        获取指定区域的仓库库存信息。
+
+        通过 OCR 识别仓库中各作物的数量，同时设置实例属性方便后续访问。
+
+        Args:
+            category (str): 区域类型，'farm'、'orchard' 或 'nursery'。
+
+        Returns:
+            dict: 作物名称到数量的映射，如 {'wheat': 50, 'corn': 30}。
+        """
         config = self.INVENTORY_CONFIG[category]
         self.warehouse_filter(config['filter'])
         image = self.device.screenshot()
@@ -250,6 +345,17 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         return results
 
     def post_plant_check(self, category):
+        """
+        检查当前岗位正在种植的作物类型。
+
+        通过模板匹配检测岗位详情页面中的作物图标，确定正在种植的作物。
+
+        Args:
+            category (str): 区域类型，'farm'、'orchard' 或 'nursery'。
+
+        Returns:
+            str 或 None: 正在种植的作物名称，未检测到则返回 None。
+        """
         config = self.INVENTORY_CONFIG[category]
         for item in config['items']:
             if self.appear(item['post_action']):
@@ -257,6 +363,20 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         return None
 
     def decided_lists(self, post_button, post_id, category, time_var_name):
+        """
+        检查指定岗位的状态并更新相关列表。
+
+        打开岗位详情，判断岗位是已完成、正在工作还是空闲：
+        - 已完成：清除作物信息和时间变量
+        - 正在工作：记录作物类型、读取剩余完成时间，从补种列表中移除
+        - 空闲：清除作物信息和时间变量
+
+        Args:
+            post_button (Button): 岗位按钮资源。
+            post_id (str): 岗位标识，如 'ISLAND_FARM_POST1'。
+            category (str): 区域类型，'farm'、'orchard' 或 'nursery'。
+            time_var_name (str): 对应的时间变量名，用于存储完成时间。
+        """
         self.post_close()
         self.post_open(post_button)
         self.device.screenshot()
@@ -297,12 +417,35 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
         return characters
 
     def post_plant(self, post_button, product, category, time_var_name):
+        """
+        在指定岗位上执行播种操作。
+
+        完整流程：打开岗位 -> 选择产品 -> 选择角色派遣 -> 确认订单 -> 记录完成时间。
+        种子不足时自动从商店购买补充。
+
+        Args:
+            post_button (Button): 岗位按钮资源。
+            product (str): 要种植的作物名称，如 'wheat'、'apple'。
+            category (str): 区域类型，'farm'、'orchard' 或 'nursery'。
+            time_var_name (str): 对应的时间变量名，用于存储完成时间。
+
+        Returns:
+            bool: 播种是否成功。
+        """
         self.post_close()
         self.post_open(post_button)
         self.device.screenshot()
         time_work = Duration(ISLAND_WORKING_TIME)
         selection = self.name_to_config[product]['selection']
         selection_check = self.name_to_config[product]['selection_check']
+        seed_config = self.name_to_config[product]
+        # 4x1 作物（秋月梨/柿子）：每次派遣只消耗 4 颗种子，与果园其他作物每单
+        # 至少 4x4=16 颗不同，种子补货目标按 4 颗/单计算
+        if seed_config.get('batch_4x1'):
+            logger.info(
+                f"[岛屿-农田] {product} 为 4x1 作物：每次派遣仅消耗 "
+                f"{seed_config['seed_number']} 颗种子（果园其他作物每单至少 16 颗）"
+            )
         for _ in self.loop(timeout=120, skip_first=False):
             if self.appear_then_click(ISLAND_POST_SELECT, offset=1):
                 self.device.sleep(0.5)
@@ -322,7 +465,6 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
                 continue
             if self.appear(ISLAND_SELECT_PRODUCT_CHECK, offset=1):
                 if self.select_product(selection, selection_check):
-                    seed_config = self.name_to_config[product]
                     if self.ensure_select_product_material(
                             item_button=seed_config['shop'],
                             required_quantity=seed_config['seed_number'],
@@ -476,18 +618,16 @@ class IslandFarm(Island, WarehouseOCR, LoginHandler):
 
             need_default = max(0, default_count - already_planted_default)
 
-            num_from_list = min(len(to_plant_list), idle_count)
-
-            for i in range(num_from_list):
-                crop_name = to_plant_list[i]
-                all_plants_to_plant[category].append(crop_name)
-
-            remaining_idle = idle_count - num_from_list
-
-            if remaining_idle > 0 and need_default > 0:
-                actual_default = min(remaining_idle, need_default)
-                for _ in range(actual_default):
-                    all_plants_to_plant[category].append(default_crop)
+            if to_plant_list:
+                # 未达标作物：按库存升序轮转分配所有空闲岗位（如 A B C A B ...）
+                for i in range(idle_count):
+                    all_plants_to_plant[category].append(to_plant_list[i % len(to_plant_list)])
+            else:
+                # 所有未达标作物都已安排后才种植默认作物
+                if idle_count > 0 and need_default > 0:
+                    actual_default = min(idle_count, need_default)
+                    for _ in range(actual_default):
+                        all_plants_to_plant[category].append(default_crop)
 
             if all_plants_to_plant[category]:
                 logger.info(f"[岛屿-农田] \n{category}需要种植的作物: {all_plants_to_plant[category]}")

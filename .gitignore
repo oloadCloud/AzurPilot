@@ -19,6 +19,7 @@ dev_tools/debug_tools
 *.lock
 config/reloadflag
 config/reloadalas
+config/webui-dependency-sync-pending
 /password.txt
 test.py
 test/
@@ -31,6 +32,7 @@ debug_ocr/
 PaddleOCR
 .trae
 docs/
+.claude
 # Created by .ignore support plugin (hsz.mobi)
 
 ### JetBrains template

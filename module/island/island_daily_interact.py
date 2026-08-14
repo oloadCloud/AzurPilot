@@ -1,3 +1,8 @@
+"""岛屿每日互动任务模块。
+
+处理岛屿低频互动任务的自动化执行，包括摸猫、JUU 速运、商区外送服务和每周照相。
+结合开发计划任务列表区域检测，按顺序执行所有已启用的互动任务。
+"""
 from datetime import timedelta
 
 from module.config.time_source import now as current_time
@@ -21,7 +26,7 @@ class IslandDailyInteract(Island):
 
     def run(self):
         """执行启用的岛屿低频互动任务。"""
-        logger.hr('Island Daily Interact Run', level=1)
+        logger.hr('岛屿每日互动运行', level=1)
         self.ui_ensure(page_island)
 
         all_done = True
@@ -48,7 +53,7 @@ class IslandDailyInteract(Island):
         """
         from module.island_daily_interact.assets import PET_CAT_FARM_INTERACT
 
-        logger.hr('Pet Cat', level=2)
+        logger.hr('撸猫', level=2)
         if not self.island_map_goto('farm'):
             logger.warning('[岛屿-每日周任务] 前往晨露农场失败，跳过摸猫任务')
             return False
@@ -75,7 +80,7 @@ class IslandDailyInteract(Island):
             TEMPLATE_JUU_EXPRESS_TASK_ICON,
         )
 
-        logger.hr('JUU Express', level=2)
+        logger.hr('JUU快递', level=2)
         if not self._detect_development_plan_template_task(
                 task_template=TEMPLATE_JUU_EXPRESS_TASK_ICON,
                 tab_button=DEVELOPMENT_PLAN_DAILY_TAB,
@@ -119,7 +124,7 @@ class IslandDailyInteract(Island):
             TEMPLATE_BUSINESS_DELIVERY_TASK_ICON,
         )
 
-        logger.hr('Business Delivery', level=2)
+        logger.hr('商业配送', level=2)
         if not self._detect_development_plan_template_task(
                 task_template=TEMPLATE_BUSINESS_DELIVERY_TASK_ICON,
                 tab_button=DEVELOPMENT_PLAN_DAILY_TAB,
@@ -165,7 +170,7 @@ class IslandDailyInteract(Island):
             WEEKLY_PHOTO_TASK_CHECK,
         )
 
-        logger.hr('Weekly Photo', level=2)
+        logger.hr('每周拍照', level=2)
         completed = True
         while 1:
             if not self._start_development_plan_template_task(
@@ -367,17 +372,14 @@ class IslandDailyInteract(Island):
         return appear
 
     def _juu_express_steps(self):
-        # 其余 2 个 JUU 速运按钮暂缺，后续补图后再补回。
         return [
             ('港口的帕特莉', 'port', self.move_for_pateli, JUU_EXPRESS_PATELI_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
             ('栖风原野的奥布莱恩', 'mine_forest', self.move_for_aobulaien, JUU_EXPRESS_AOBULAIEN_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
             ('晨露农场的梅莉', 'farm', self.move_for_meili, JUU_EXPRESS_MEILI_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
             ('集会岛的莉莎', 'assembly', self.move_for_lisha, JUU_EXPRESS_LISHA_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
-            # 缺图：繁荫农圃的拉科尼娅
-            # ('繁荫农圃的拉科尼娅', 'nursery', self.move_for_lakeniya, JUU_EXPRESS_LAKENIYA_INTERACT, ROUTE_THREE_OPTION_COMPLETE),
+            ('繁荫农圃的拉科尼娅', 'nursery', self.move_for_lakeniya, JUU_EXPRESS_LAKENIYA_INTERACT, ROUTE_THREE_OPTION_COMPLETE),
             ('栖风原野的乔安', 'mine_forest', self.move_for_qiaoan, JUU_EXPRESS_QIAOAN_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
-            # 缺图：晨露农场的奥利匹克
-            # ('晨露农场的奥利匹克', 'farm', self.move_for_aolipike, JUU_EXPRESS_AOLIPIKE_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
+            ('晨露农场的奥利匹克', 'farm', self.move_for_aolipike, JUU_EXPRESS_AOLIPIKE_INTERACT, ROUTE_TWO_OPTION_COMPLETE),
             ('港口商区的阿莫玛', 'port_business', self.move_for_amoma, JUU_EXPRESS_AMOMA_INTERACT, ROUTE_THREE_OPTION_COMPLETE),
             ('繁荫农圃的露西', 'nursery', self.move_for_luxi, JUU_EXPRESS_LUXI_INTERACT, ROUTE_THREE_OPTION_COMPLETE),
         ]
@@ -549,7 +551,9 @@ class IslandDailyInteract(Island):
 
     def _click_optional_interact_or_complete(self, interact_button, complete_button, label, timeout=8):
         for _ in self.loop(timeout=timeout):
-            if self.appear_then_click(interact_button, interval=2):
+            # 交互按钮用模板匹配而非纯颜色检测：已完成状态下同一区域可能被
+            # “管理苗圃”等浅色选项行占据，颜色检测会误判为未完成并误点卡住。
+            if self.appear_then_click(interact_button, offset=(20, 20), interval=2):
                 logger.info(f'[岛屿-每日周任务] 点击{label}')
                 return 'clicked'
             if self.appear(complete_button, offset=(20, 20)):

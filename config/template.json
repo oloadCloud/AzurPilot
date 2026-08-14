@@ -74,6 +74,7 @@
       "ServerName": "disabled",
       "ScreenshotMethod": "auto",
       "ControlMethod": "MaaTouch",
+      "GameSettings": false,
       "ScreenshotDedithering": false,
       "AdbRestart": false
     },
@@ -108,6 +109,7 @@
     "Optimization": {
       "OcrDevice": "auto",
       "OcrBackend": "auto",
+      "OcrWindowsMlVendorEp": true,
       "OcrModelVersionEnglish": "auto",
       "OcrModelVersionChinese": "auto",
       "OcrModelVersionJapanese": "auto",
@@ -193,7 +195,8 @@
     },
     "Restart": {
       "RandomDelay": "5, 50",
-      "ClearCache": false
+      "ClearCache": false,
+      "LoginWaitTimeout": 30
     },
     "Storage": {
       "Storage": {}
@@ -473,6 +476,8 @@
       "AllowLowVanguardLevel": false,
       "DelayTaskIFNoFlagship": false,
       "CommissionLimit": false,
+      "HighValueCommissionFilterCount": 32,
+      "HighValueCommissionReserve": 2,
       "VanguardLevelMin": 1,
       "VanguardLevelMax": 125
     },
@@ -560,6 +565,8 @@
       "AllowLowVanguardLevel": false,
       "DelayTaskIFNoFlagship": false,
       "CommissionLimit": false,
+      "HighValueCommissionFilterCount": 32,
+      "HighValueCommissionReserve": 2,
       "VanguardLevelMin": 1,
       "VanguardLevelMax": 125
     },
@@ -647,6 +654,8 @@
       "AllowLowVanguardLevel": false,
       "DelayTaskIFNoFlagship": false,
       "CommissionLimit": false,
+      "HighValueCommissionFilterCount": 32,
+      "HighValueCommissionReserve": 2,
       "VanguardLevelMin": 1,
       "VanguardLevelMax": 28
     },
@@ -1168,7 +1177,7 @@
       "DefeatWithdraw": "withdraw_stop"
     },
     "Coalition": {
-      "Mode": "tc3",
+      "Mode": "hard",
       "Fleet": "single"
     },
     "StopCondition": {
@@ -1191,6 +1200,64 @@
       "Fleet2Value": 119,
       "Fleet2Record": "2020-01-01 00:00:00",
       "Fleet2Control": "prevent_yellow_face",
+      "Fleet2Recover": "not_in_dormitory",
+      "Fleet2Oath": false,
+      "Fleet2Onsen": false
+    },
+    "Storage": {
+      "Storage": {}
+    }
+  },
+  "CoalitionScuttle": {
+    "Scheduler": {
+      "Enable": false,
+      "PushNotification": false,
+      "NextRun": "2020-01-01 00:00:00",
+      "Command": "CoalitionScuttle",
+      "SuccessInterval": 30,
+      "FailureInterval": 30,
+      "ServerUpdate": "00:00",
+      "Sensitive": false
+    },
+    "CoalitionScuttle": {
+      "Sacrifice": "vanguard"
+    },
+    "Campaign": {
+      "Name": "dynamic",
+      "Event": "campaign_main",
+      "Mode": "normal",
+      "UseClearMode": true,
+      "UseFleetLock": true,
+      "UseAutoSearch": false,
+      "Use2xBook": false,
+      "AmbushEvade": true,
+      "UseRecommendFleet": false,
+      "DefeatWithdraw": "withdraw_stop"
+    },
+    "Coalition": {
+      "Mode": "hard",
+      "Fleet": "single"
+    },
+    "StopCondition": {
+      "OilLimit": 1000,
+      "CoinLimit": 0,
+      "RunCount": 0,
+      "MapAchievement": "non_stop",
+      "StageIncrease": false,
+      "GetNewShip": false,
+      "ReachLevel": 0
+    },
+    "Emotion": {
+      "Mode": "calculate",
+      "Fleet1Value": 119,
+      "Fleet1Record": "2020-01-01 00:00:00",
+      "Fleet1Control": "prevent_green_face",
+      "Fleet1Recover": "not_in_dormitory",
+      "Fleet1Oath": false,
+      "Fleet1Onsen": false,
+      "Fleet2Value": 119,
+      "Fleet2Record": "2020-01-01 00:00:00",
+      "Fleet2Control": "prevent_green_face",
       "Fleet2Recover": "not_in_dormitory",
       "Fleet2Oath": false,
       "Fleet2Onsen": false
@@ -1836,7 +1903,7 @@
       "DefeatWithdraw": "withdraw_stop"
     },
     "Coalition": {
-      "Mode": "tc3",
+      "Mode": "hard",
       "Fleet": "single"
     },
     "StopCondition": {
@@ -1880,8 +1947,14 @@
     },
     "Commission": {
       "PresetFilter": "cube",
-      "AddShortest": true,
-      "CustomFilter": "DailyEvent > Gem-4 > Gem-2 > Gem-8 > ExtraCube-0:30\n> UrgentCube-1:30 > UrgentCube-1:45 > UrgentCube-3\n> ExtraDrill-5:20 > ExtraDrill-2 > ExtraDrill-3:20\n> UrgentCube-2:15 > UrgentCube-4\n> ExtraDrill-1 > UrgentCube-6 > ExtraCube-1:30\n> ExtraDrill-2:40 > ExtraDrill-0:20\n> expire\n> Major > DailyChip > DailyResource\n> ExtraPart-0:30 > ExtraOil-1 > UrgentBox-6\n> ExtraCube-3 > ExtraPart-1 > UrgentBox-3\n> ExtraCube-4 > ExtraPart-1:30 > ExtraOil-4\n> UrgentBox-1 > ExtraCube-5 > UrgentBox-1\n> ExtraCube-8 > ExtraOil-8\n> UrgentDrill-4 > UrgentDrill-2:40 > UrgentDrill-2\n> UrgentDrill-1 > UrgentDrill-1:30 > UrgentDrill-1:10\n> Extra-0:20 > Extra-0:30 > Extra-1:00 > Extra-1:30 > Extra-2:00\n> shortest",
+      "DynamicProgramming": true,
+      "TierValueRatio": 2.0,
+      "DelayHalfLife": 100.0,
+      "DeadlineFutureHorizon": 0.5,
+      "FilterValueFloor": 0.6,
+      "FilterValueHalfLife": 4.0,
+      "CustomFilter": "DailyEvent > Gem-4 > Gem-2 > Gem-8 > ExtraCube-0:30\n> UrgentCube-1:30 > UrgentCube-1:45 > UrgentCube-3\n> ExtraDrill-5:20 > ExtraDrill-2 > ExtraDrill-3:20\n> UrgentCube-2:15 > UrgentCube-4\n> ExtraDrill-1 > UrgentCube-6 > ExtraCube-1:30\n> ExtraDrill-2:40 > ExtraDrill-0:20\n> Major > DailyChip > DailyResource\n> ExtraPart-0:30 > ExtraOil-1 > UrgentBox-6\n> ExtraCube-3 > ExtraPart-1 > UrgentBox-3\n> ExtraCube-4 > ExtraPart-1:30 > ExtraOil-4\n> UrgentBox-1 > ExtraCube-5 > UrgentBox-1\n> ExtraCube-8 > ExtraOil-8\n> UrgentDrill-4 > UrgentDrill-2:40 > UrgentDrill-2\n> UrgentDrill-1 > UrgentDrill-1:30 > UrgentDrill-1:10\n> Extra-0:20 > Extra-0:30 > Extra-1:00 > Extra-1:30 > Extra-2:00\n> shortest",
+      "Blacklist": null,
       "DoMajorCommission": false,
       "CommissionNotifyReward": false,
       "CommissionNotifyRewardStatistics": true
@@ -2612,8 +2685,7 @@
       "ActionPointPreserve": 1000,
       "HazardLevel": 5,
       "TargetZone": 0,
-      "StayInZone": false,
-      "APPreserveUntilReset": false
+      "StayInZone": false
     },
     "OpsiSirenBug": {
       "SirenResearch_Enable": true,
@@ -2700,7 +2772,11 @@
       "EnableObscure": false,
       "EnableAbyssal": false,
       "EnableStronghold": false,
-      "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
+      "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming",
+      "MonthEndActionPointCleanupEnable": false,
+      "MonthEndActionPointCleanupDays": 0,
+      "MonthEndActionPointPreserve": 0,
+      "MonthEndShopPurchase": true
     },
     "Storage": {
       "Storage": {}
@@ -2817,6 +2893,7 @@
       "Product3": "None",
       "Product4": "None",
       "Product5": "None",
+      "SeasonalFallback": "sunny_honey",
       "BoostReplaceFilter": "30 > 20 > strawberry_honey > fruit_paradise > 10"
     },
     "IslandBusinessShop3": {
@@ -2902,7 +2979,9 @@
     },
     "IslandRancher": {
       "MinChicken": 300,
+      "ChickenFilter": "WorkerJuu",
       "MinPork": 300,
+      "PigFilter": "WorkerJuu",
       "Milk": true,
       "RancherFilter": "WorkerJuu",
       "Wool": true,
@@ -3288,6 +3367,20 @@
       "BuyNextRun": "2020-01-01 00:00:00",
       "DailyPriceRefresh": false,
       "NextPearlTradeTime": "2020-01-01 00:00:00"
+    },
+    "Storage": {
+      "Storage": {}
+    }
+  },
+  "FleetScan": {
+    "Storage": {
+      "Storage": {}
+    }
+  },
+  "FleetInfo": {
+    "FleetInfo": {
+      "Result": {},
+      "Record": "2020-01-01 00:00:00"
     },
     "Storage": {
       "Storage": {}

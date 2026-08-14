@@ -1,3 +1,8 @@
+"""岛屿每日订单模块。
+
+处理岛屿每日订单的自动化交付，包括紧急委托检测、订单刷新与货物筹备状态判断。
+支持订单页面状态识别（为空/紧急/可交付/驳回）与左侧挑战图标的逐个处理。
+"""
 from module.island.island import Island
 import module.island_daily_order.assets as daily_order_assets
 from module.island_daily_order.assets import *
@@ -60,7 +65,7 @@ class IslandDailyOrder(Island):
     _urgent_template_cache = None
 
     def run(self):
-        logger.hr('Island Daily Order Run', level=1)
+        logger.hr('岛屿每日订单', level=1)
 
         self.ui_ensure(page_island)
 
@@ -580,7 +585,7 @@ class IslandDailyOrder(Island):
         cls._urgent_template_cache = tuple(sorted(templates, key=cls._urgent_template_sort_key))
         return cls._urgent_template_cache
 
-    def _template_match_urgent(self, template, similarity=0.80):
+    def _template_match_urgent(self, template, similarity=0.75):
         """
         获取紧急模板在左侧面板中的匹配位置及尺寸。
 
@@ -599,7 +604,7 @@ class IslandDailyOrder(Island):
         x1, y1, x2, y2 = button.area
         return (x1, y1, x2 - x1, y2 - y1)
 
-    def _template_click_urgent(self, similarity=0.80):
+    def _template_click_urgent(self, similarity=0.75):
         """点击左侧面板中第一个匹配到的紧急模板，返回匹配位置信息。"""
         for name, template in self._urgent_templates():
             match = self._template_match_urgent(template, similarity=similarity)

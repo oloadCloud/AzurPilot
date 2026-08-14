@@ -31,12 +31,6 @@ Deploy:
     # [其他情况] 连接到不受信任的网络时使用 false
     # [Other] Use false to when connected to an untrusted network
     SSLVerify: true
-    # 启动时自动更新 AzurPilot
-    # Update AzurPilot at startup
-    # [大多数情况] 使用 true
-    # [In most cases] Use true
-    AutoUpdate: true
-
   Python:
     # Python 可执行文件路径
     # Filepath of python executable.
@@ -152,7 +146,7 @@ Deploy:
     # ! You need to set Password below to enable remote access since everyone can access to your ap if they have your url.
     # 详情请参阅 https://app.azurlane.cloud/
     # See here (http://app.azurlane.cloud/en.html) for more infomation.
-    EnableRemoteAccess: true
+    EnableRemoteAccess: false
     # 远程访问模式
     # Remote access mode
     # [自动] auto（优先 P2P/TURN，失败回退 SSH 转发）
@@ -201,8 +195,8 @@ Deploy:
   Webui:
     # --host. 监听的主机地址
     # --host. Host to listen
-    # [使用 IPv6] '::'
-    # [Use IPv6] '::'
+    # [0.0.0.0 或 :: 均支持 IPv4/IPv6 双栈]
+    # [Both 0.0.0.0 and :: support IPv4/IPv6 dual stack]
     # [大多数情况] 默认 '0.0.0.0'
     # [In most cases] Default to '0.0.0.0'
     WebuiHost: 0.0.0.0

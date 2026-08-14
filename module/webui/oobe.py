@@ -1,3 +1,10 @@
+"""
+首次启动向导（OOBE）。
+
+在用户首次启动且没有配置文件时，通过 PyWebIO 引导完成基本设置，
+包括语言选择、实例命名等初始化配置。
+"""
+
 # OOBE (Out-Of-Box Experience) 初次设置向导
 # 在用户首次启动、没有配置文件时引导完成基本设置
 #
@@ -1074,7 +1081,7 @@ class OOBEWizard:
             "cn": ("cn_android", "cn_ios", "cn_channel"),
             "en": ("en",),
             "jp": ("jp",),
-            "tw": (),
+            "tw": ("tw",),
         }.get(region, ())
 
     def _server_name_items_for_region(self, region):
@@ -1084,8 +1091,6 @@ class OOBEWizard:
                 value = f"{prefix}-{index}"
                 label_prefix = "国服" if prefix.startswith("cn") else prefix.upper()
                 items.append((value, f"[{label_prefix}] {name}", value))
-        if region == "tw":
-            items.append(("disabled", lang.t("Emulator.ServerName.disabled"), "TW"))
         return items
 
     def _default_server_name_for_region(self, region):
