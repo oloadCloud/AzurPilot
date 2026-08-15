@@ -155,7 +155,8 @@ body *:not(#pywebio-scope-log):not(#pywebio-scope-log *) {
 	#pywebio-scope-groups > *:not(#pywebio-scope-navigator),
 	#pywebio-scope-develop_detail,
 	#pywebio-scope-manage_add_form,
-	#pywebio-scope-manage_import_panel,
+	#alas-update-notice,
+	.alert-warning,
 	*[style*="--manage-config-card--"]
 ) {
 	background-color: var(--fluent-card-bg) !important;
@@ -258,7 +259,8 @@ body *:not(#pywebio-scope-log):not(#pywebio-scope-log *) {
 }
 
 /* --- 4.4 右侧快捷导航 --- */
-#pywebio-scope-navigator {
+#pywebio-scope-navigator,
+#pywebio-scope-groups {
 	background: transparent !important;
 	border: none !important;
 	box-shadow: none !important;
@@ -671,7 +673,7 @@ th:last-child { border-top-right-radius: var(--radius-card) !important; }
    ========================================== */
 #pywebio-scope-content,
 #pywebio-scope-groups,
-p, span, label, td, th, li, div {
+p, label, td, th, li, div {
 	color: var(--fluent-text) !important;
 }
 

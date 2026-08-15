@@ -79,64 +79,27 @@ class AzurLaneAutoScript:
 
     def _try_restart_emulator(self):
         """
-        尝试重启模拟器。永不放弃，一直重试。
-
-        不再受 Error_AdbOfflineRestart 开关限制，
-        超过阈值时仅增加等待间隔，不停止重试。
-        优先使用已缓存的 device 对象，否则根据平台回退创建新实例。
-
-        Returns:
-            bool: 重启成功返回 True，本次重启失败返回 False（调度器会继续尝试）。
+        拦截所有尝试关闭模拟器的越权行为。
+        遇到任何严重异常时，仅停止调度器并发送通知，等待人工介入。
         """
-        import sys
-
-        self.consecutive_adb_offline += 1
-        limit = int(self.config.Error_AdbOfflineThreshold)
-        logger.warning(f'[Alas] EmulatorNotRunningError: 连续次数 {self.consecutive_adb_offline}/{limit}')
-
-        # 超过阈值时不放弃，仅增加等待间隔后继续重试
-        if self.consecutive_adb_offline > limit:
-            wait_seconds = min(300, 30 * (self.consecutive_adb_offline - limit + 1))
-            logger.warning(
-                f'[Alas] 已超过重启阈值 {limit}，'
-                f'等待 {wait_seconds} 秒后继续重试（永不放弃）'
-            )
-            time.sleep(wait_seconds)
-
-        logger.hr('[Alas] 正在重启模拟器', level=1)
+        logger.critical('拦截到尝试关闭模拟器的越权行为。')
+        logger.critical('AzurPilot 已停止运行，等待人工介入处理。')
+        
         try:
-            # 优先使用已缓存的设备对象
-            device = self.__dict__.get('device', None)
-            if device is None:
-                # device 缓存不存在时，按平台回退创建新实例
-                if sys.platform == 'darwin':
-                    from module.device.platform.platform_mac import PlatformMac
-                    device = PlatformMac(self.config)
-                else:
-                    from module.device.platform.platform_windows import PlatformWindows
-                    device = PlatformWindows(self.config)
-
-            logger.info('[Alas] 正在停止模拟器...')
-            device.emulator_stop()
-            time.sleep(5)
-            logger.info('[Alas] 正在启动模拟器...')
-            device.emulator_start()
-            logger.info('[Alas] 模拟器重启完成')
-
-            # 清除 device 缓存，下次访问时重新建立连接
-            if 'device' in self.__dict__:
-                del_cached_property(self, 'device')
-            # 重置连续离线计数
-            self.consecutive_adb_offline = 0
-            return True
-        except Exception as e:
-            logger.exception_context(
-                title='重启模拟器失败',
-                exc=e,
-                impact='模拟器仍可能处于离线状态，调度器将继续尝试。',
-                action='检查模拟器进程权限、ADB 服务和模拟器管理配置。',
+            handle_notify(
+                self.config.Error_OnePushConfig,
+                title=f"AzurPilot <{self.config_name}> 已停止运行",
+                content=f"<{self.config_name}> 遇到严重异常。已禁止自动重启模拟器，请手动检查游戏与模拟器状态。",
             )
-            return False
+            notify_webui(
+                self.config_name,
+                title=f"<{self.config_name}> 需要人工介入喵！已停止运行喵！",
+                content=f"遇到严重异常且已禁止重启模拟器，请手动处理喵~",
+            )
+        except Exception:
+            pass
+        
+        exit(1)
 
     def _start_emulator_after_long_wait(self):
         """

@@ -480,67 +480,8 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         return True
 
     def emulator_start(self):
-        """
-        启动模拟器，最多重试 3 次。
-        针对 MuMu12 等模拟器添加实例查找失败后的等待重试机制，
-        以及权限冲突时的强制进程清理。
-        """
-        logger.hr('模拟器启动', level=1)
-
-        # 检查是否为 MuMuPlayer12，添加实例查找失败的处理逻辑
-        emulator_type = getattr(self.config, 'EmulatorInfo_Emulator', '')
-        is_mumu12 = emulator_type == 'MuMuPlayer12' or (
-            hasattr(self, '_emulator_instance') and
-            self._emulator_instance and
-            self._emulator_instance.type == 'MuMuPlayer12'
-        )
-
-        for attempt in range(3):
-            # 先停止（MuMu12 已使用同步执行确保关闭完成）
-            if not self._emulator_function_wrapper(self._emulator_stop):
-                return False
-
-            # MuMu12: 等待一小段时间确保进程状态稳定
-            if is_mumu12:
-                import time
-                # 检测是否有残留进程导致权限冲突
-                # 权限冲突通常由 MuMuManager/MuMuPlayer 僵死进程引起
-                has_mumu_process = False
-                for proc in psutil.process_iter(['name', 'cmdline']):
-                    try:
-                        name = proc.info['name'] or ''
-                        if name.lower() in ('mumuplayer.exe', 'mumumanager.exe',
-                                            'nemuplayer.exe', 'nemuheadless.exe'):
-                            has_mumu_process = True
-                            logger.warning(f'[设备-Windows] 检测到MuMu残留进程: {name} (PID={proc.pid})')
-                            proc.kill()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
-                if has_mumu_process:
-                    logger.info('[设备-Windows] MuMuPlayer12: 已终止残留进程，等待5秒')
-                    time.sleep(5)
-                else:
-                    logger.info('[设备-Windows] MuMuPlayer12: 等待2秒让进程状态稳定')
-                    time.sleep(2)
-
-            # 再启动
-            if self._emulator_function_wrapper(self._emulator_start):
-                # 成功
-                if self.emulator_start_watch():
-                    return True
-                logger.warning('[设备-Windows] 模拟器启动监视失败，重试中')
-                if self._emulator_function_wrapper(self._emulator_stop):
-                    continue
-                else:
-                    return False
-            else:
-                # 启动失败，停止后重试
-                if self._emulator_function_wrapper(self._emulator_stop):
-                    continue
-                else:
-                    return False
-
-        logger.error('[设备-Windows] 尝试3次启动模拟器失败，已停止')
+        """禁止 Alas 启动模拟器。"""
+        logger.warning('[设备-Windows] 已禁止 Alas 自动启动模拟器，请手动启动')
         return False
 
     def emulator_stop(self):
