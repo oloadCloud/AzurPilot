@@ -2,7 +2,7 @@ import random
 import time
 
 import requests
-
+import urllib.request
 from deploy.config import DeployConfig, ExecutionError
 from deploy.git_over_cdn.client import GitOverCdnClient
 from deploy.git_over_cdn.endpoints import CLOUDFLARE_UPDATE_URLS, FALLBACK_UPDATE_URLS
@@ -222,24 +222,33 @@ class GitManager(DeployConfig):
             if self.goc_client.update():
                 return
 
-        proxy = self.GitProxy
-        if proxy and str(proxy).lower() == 'auto':
-            import urllib.request
+        config_proxy = self.GitProxy
+        actual_proxy = ''
+        if config_proxy and str(config_proxy).lower() == 'auto':
             proxies = urllib.request.getproxies()
-            proxy = proxies.get('http') or proxies.get('https')
-            if proxy:
-                if not proxy.startswith('http://') and not proxy.startswith('socks'):
-                    proxy = f'http://{proxy}'
-                logger.info(f'GitProxy is "auto", detected system proxy: {proxy}')
+            system_proxy = None
+            proxy_type = 'http'
+            for proto in ['http', 'https', 'socks']:
+                if proto in proxies:
+                    system_proxy = proxies[proto]
+                    proxy_type = proto
+                    break
+            if system_proxy:
+                if '://' not in system_proxy:
+                    prefix = 'socks5h://' if proxy_type == 'socks' else 'http://'
+                    system_proxy = f'{prefix}{system_proxy}'
+                actual_proxy = system_proxy
+                logger.info(f'GitProxy is "auto", detected system proxy: {actual_proxy}')
             else:
-                proxy = ''
                 logger.info('GitProxy is "auto", but no system proxy detected')
+        elif config_proxy:
+            actual_proxy = str(config_proxy)
 
         self.git_repository_init(
             repo=self.Repository,
             source='origin',
             branch=self.Branch,
-            proxy=proxy,
+            proxy=actual_proxy,
             ssl_verify=self.SSLVerify,
         )
 
