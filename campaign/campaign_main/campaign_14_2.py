@@ -47,7 +47,7 @@ A6, B6, C6, D6, E6, F6, G6, H6, I6, \
 A7, B7, C7, D7, E7, F7, G7, H7, I7, \
 A8, B8, C8, D8, E8, F8, G8, H8, I8, \
     = MAP.flatten()
-road_H7 = RoadGrids([[G6, G7, H6], [G6, G7, H7]])
+road_H7 = RoadGrids([[G7, H6], [G6, H5]])
 road_A5 = RoadGrids([[A4, B5]])
 
 
@@ -69,8 +69,7 @@ class Campaign(CampaignBase):
 
     def battle_0(self):
         # 14-2 do not have light house
-
-        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
+        if self.clear_potential_roadblocks([road_A5, road_H7], strongest=True):
             return True
 
         return self.battle_default()
@@ -79,17 +78,6 @@ class Campaign(CampaignBase):
         if not self.picked_flare and H7.is_accessible and A5.is_accessible:
             self.pick_up_flare(H7)
             self.pick_up_flare(A5)
-        if self.clear_roadblocks([road_A5, road_H7], weakest=True):
-            return True
-            
-        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
-            return True
-
-        return self.battle_default()
-
-    def battle_5(self):
-        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
-            return True
 
         return self.battle_default()
 
