@@ -706,7 +706,7 @@ p[style*="--arg-help--"],
 }
 
 :is(.CodeMirror-line, .CodeMirror-line span, .CodeMirror-lines, .CodeMirror-code) {
-	color: var(--fluent-code-text) !important;
+	color: var(--fluent-code-text);
 	font-family: var(--fluent-font-mono) !important;
 }
 

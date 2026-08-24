@@ -281,7 +281,7 @@ class AzurLaneAutoScript:
         except Exception:
             pass
         
-        os._exit(1)
+        raise SystemExit(1)
 
     def _emulator_op_with_timeout(self, func, *, timeout, operation_name):
         """带硬超时执行模拟器启停操作，防止恢复流程本身卡死。

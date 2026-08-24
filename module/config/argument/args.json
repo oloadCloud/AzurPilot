@@ -3544,6 +3544,10 @@
         "value": false,
         "display": "hide"
       },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -5347,6 +5351,10 @@
         "value": false,
         "display": "hide"
       },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -5639,6 +5647,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -6243,6 +6255,10 @@
         "value": false,
         "display": "hide"
       },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -6541,6 +6557,10 @@
         "type": "checkbox",
         "value": false,
         "display": "hide"
+      },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -10048,6 +10068,10 @@
         "value": false,
         "display": "hide"
       },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -10317,6 +10341,10 @@
         "type": "checkbox",
         "value": false,
         "display": "hide"
+      },
+      "BossAutoSearch": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -10678,7 +10706,7 @@
     "Tactical": {
       "TacticalFilter": {
         "type": "textarea",
-        "value": "SameT4 > SameT3 > SameT2 > SameT1\n> BlueT2 > YellowT2 > RedT2\n> BlueT3 > YellowT3 > RedT3\n> BlueT4 > YellowT4 > RedT4\n> BlueT1 > YellowT1 > RedT1\n> first"
+        "value": "SameT3 > SameT2 > SameT1\n> BlueT2 > YellowT2 > RedT2\n> BlueT3 > YellowT3 > RedT3\n> BlueT1 > YellowT1 > RedT1"
       },
       "RapidTrainingSlot": {
         "type": "select",
