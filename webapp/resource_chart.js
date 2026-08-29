@@ -222,11 +222,10 @@
         };
 
         // ---- Draw background and grid ----
-        ctx.fillStyle = "#1a1a2e";
-        ctx.fillRect(0, 0, W, H);
+        ctx.clearRect(0, 0, W, H);
 
         // Grid lines + 左轴参考刻度
-        ctx.strokeStyle = "#2a2a3e";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
         ctx.lineWidth = 1;
         ctx.fillStyle = "#666";
         ctx.font = "11px -apple-system, sans-serif";
@@ -473,11 +472,10 @@
         };
 
         // Clear
-        ctx.fillStyle = "#1a1a2e";
-        ctx.fillRect(0, 0, W, H);
+        ctx.clearRect(0, 0, W, H);
 
         // Grid & left axis 参考刻度
-        ctx.strokeStyle = "#2a2a3e";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
         ctx.lineWidth = 1;
         ctx.fillStyle = "#666";
         ctx.font = "11px -apple-system, sans-serif";

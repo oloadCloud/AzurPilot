@@ -439,6 +439,18 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
 
         for _ in self.loop():
 
+            # 检测D评价（沉船）弹窗——这是沉船的确认性标志
+            # 只有OPTS_INFO_D出现才确认是真正的D评价并扣心情
+            # S/A/B/C转场误匹配BATTLE_STATUS_D不会出现OPTS_INFO_D，不会扣心情
+            if not self._withdraw:
+                if self.appear(OPTS_INFO_D, offset=(30, 30)):
+                    logger.info('[自动搜索-结算] 检测到沉船弹窗，进入撤退处理')
+                    if self._auto_search_emotion_reduce and not self._shipwreck_emotion_reduced:
+                        self.emotion.reduce(self._auto_search_fleet_index, shipwreck=True)
+                        self._shipwreck_emotion_reduced = True
+                    self._withdraw = True
+                    continue
+
             # End
             if self.is_auto_search_running():
                 self._auto_search_status_confirm = False
@@ -542,16 +554,6 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             if self.handle_battle_status():
                 continue
             if self.handle_exp_info():
-                continue
-            # 检测D评价（沉船）弹窗——这是沉船的确认性标志（二次确认）
-            # 只有OPTS_INFO_D出现才确认是真正的D评价并扣心情
-            # S/A/B/C转场误匹配BATTLE_STATUS_D不会出现OPTS_INFO_D，不会扣心情
-            if self.appear(OPTS_INFO_D, offset=(30, 30)):
-                logger.info('[自动搜索-结算] 检测到沉船弹窗，进入撤退处理')
-                if self._auto_search_emotion_reduce and not self._shipwreck_emotion_reduced:
-                    self.emotion.reduce(self._auto_search_fleet_index, shipwreck=True)
-                    self._shipwreck_emotion_reduced = True
-                self._withdraw = True
                 continue
 
             # Handle low emotion combat

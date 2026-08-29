@@ -103,7 +103,8 @@ body *:not(#pywebio-scope-log):not(#pywebio-scope-log *) {
 	font-family: var(--fluent-font-stack) !important;
 }
 
-#pywebio-scope-content {
+#pywebio-scope-content,
+#pywebio-scope-statistics-content {
 	background-color: transparent !important;
 }
 
@@ -144,11 +145,6 @@ body *:not(#pywebio-scope-log):not(#pywebio-scope-log *) {
 	#pywebio-scope-scheduler-bar,
 	#pywebio-scope-stat-bar,
 	#pywebio-scope-image-container,
-	#pywebio-scope-ap_chart,
-	#pywebio-scope-resource_chart,
-	#pywebio-scope-opsi_stats,
-	#pywebio-scope-ship_exp_table,
-	#pywebio-scope-commission_income,
 	#pywebio-scope-log-bar,
 	#pywebio-scope-log,
 	.container-log,
@@ -625,10 +621,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* ==========================================
    9. 新表格与统计面板
    ========================================== */
-:is(#pywebio-scope-opsi_stats, #pywebio-scope-ship_exp_table, #pywebio-scope-commission_income) {
-	background: transparent !important;
-}
-
 :where(table, table table, table tbody, table thead, table tr, table td, table th) {
 	background: transparent !important;
 }
@@ -646,26 +638,41 @@ th {
 	color: var(--fluent-text-secondary) !important;
 }
 
-th:first-child { border-top-left-radius: var(--radius-card) !important; }
-th:last-child { border-top-right-radius: var(--radius-card) !important; }
-
-#pywebio-scope-opsi_stats tr:hover td,
-#pywebio-scope-ship_exp_table tr:hover td,
-#pywebio-scope-commission_income tr:hover td {
-	background-color: var(--fluent-accent-light) !important;
+:is(
+	#pywebio-scope-ap_chart,
+	#pywebio-scope-resource_chart,
+	#pywebio-scope-opsi_stats,
+	#pywebio-scope-ship_exp_table,
+	#pywebio-scope-commission_income
+) {
+	background-color: var(--fluent-card-bg) !important;
+	backdrop-filter: blur(24px) saturate(135%) !important;
+	-webkit-backdrop-filter: blur(24px) saturate(135%) !important;
+	border: 1px solid var(--fluent-glass-border) !important;
+	border-radius: var(--radius-card) !important;
+	box-shadow: var(--fluent-shadow) !important;
+	padding: 6px;
+	margin: 6px;
+	position: relative;
+	z-index: 1;
+	&:hover {
+		z-index: 2;
+	}
 }
 
 :is(
-	#pywebio-scope-commission_income .commission-income-summary,
-	#pywebio-scope-commission_income .commission-income-table-wrap,
-	#pywebio-scope-commission_income .commission-income-recent,
-	#pywebio-scope-commission_income .commission-income-metric-card,
-	#pywebio-scope-commission_income .commission-income-table,
-	#pywebio-scope-commission_income .commission-income-recent-row
+	[id^="rc_"][id$="_container"],
+	[id^="rc_"][id$="_tip"],
+	[id^="rc_"][id$="_zoom_in"],
+	[id^="rc_"][id$="_zoom_out"],
+	[id^="rc_"][id$="_reset"]
 ) {
-	border-color: var(--fluent-glass-border) !important;
-	border-radius: var(--radius-default) !important;
-	background-color: var(--fluent-table-bg-solid) !important;
+	background-color: var(--fluent-card-bg) !important;
+	backdrop-filter: blur(24px) saturate(135%) !important;
+	-webkit-backdrop-filter: blur(24px) saturate(135%) !important;
+	border: 1px solid var(--fluent-glass-border) !important;
+	border-radius: var(--radius-card) !important;
+	box-shadow: var(--fluent-shadow) !important;
 }
 
 /* ==========================================
