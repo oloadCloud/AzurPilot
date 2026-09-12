@@ -354,7 +354,10 @@ class Map(Fleet):
         if self.config.Campaign_BossAutoSearch and self.appear(AUTO_SEARCH_MAP_OPTION_OFF, offset=(5, 5)):
             logger.hr('Clear BOSS via Auto Search')
             self.device.click(AUTO_SEARCH_MAP_OPTION_OFF)
-            fleet_index = self.fleet_boss_index if self.config.FLEET_2 else 1
+            if self.config.FLEET_2:
+                fleet_index = 3 - self.config.FLEET_BOSS if self.fleets_reversed else self.config.FLEET_BOSS
+            else:
+                fleet_index = 1
             self.combat(expected_end='in_stage', fleet_index=fleet_index)
             return True
             
