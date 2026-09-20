@@ -2,7 +2,7 @@ import random
 import time
 
 import requests
-
+import urllib.request
 from deploy.config import DeployConfig, ExecutionError
 from deploy.git_over_cdn.client import GitOverCdnClient
 from deploy.git_over_cdn.endpoints import CLOUDFLARE_UPDATE_URLS, FALLBACK_UPDATE_URLS
@@ -74,7 +74,7 @@ class GitManager(DeployConfig):
         for i in range(max_retry):
             git = f'"{self.git}" -c http.userAgent={ua}'
             logger.info(f'Use git User-Agent: {ua}')
-            if self.execute(f'{git} fetch {source} {branch}'):
+            if self.execute(f'{git} fetch {source} {branch}:refs/remotes/{source}/{branch}'):
                 return
             logger.warning(f'git fetch failed with UA {ua}, attempt {i + 1}/{max_retry}')
             if i < max_retry - 1:
@@ -225,11 +225,33 @@ class GitManager(DeployConfig):
             if self.goc_client.update():
                 return
 
+        config_proxy = self.GitProxy
+        actual_proxy = ''
+        if config_proxy and str(config_proxy).lower() == 'auto':
+            proxies = urllib.request.getproxies()
+            system_proxy = None
+            proxy_type = 'http'
+            for proto in ['http', 'https', 'socks']:
+                if proto in proxies:
+                    system_proxy = proxies[proto]
+                    proxy_type = proto
+                    break
+            if system_proxy:
+                if '://' not in system_proxy:
+                    prefix = 'socks5h://' if proxy_type == 'socks' else 'http://'
+                    system_proxy = f'{prefix}{system_proxy}'
+                actual_proxy = system_proxy
+                logger.info(f'GitProxy is "auto", detected system proxy: {actual_proxy}')
+            else:
+                logger.info('GitProxy is "auto", but no system proxy detected')
+        elif config_proxy:
+            actual_proxy = str(config_proxy)
+
         self.git_repository_init(
             repo=self.Repository,
             source='origin',
             branch=self.Branch,
-            proxy=self.GitProxy,
+            proxy=actual_proxy,
             ssl_verify=self.SSLVerify,
         )
 
