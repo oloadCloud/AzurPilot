@@ -146,10 +146,18 @@ COMMISSION_FILTER = CommissionFilter(
         '-?'
         '(\d\d?:\d\d)?'
         '(\d\d?.\d\d?|\d\d?)?'
+        '-?'
+        '(vi|iv|iii|ii|i|v)?'
     ),
-    attr=('category_str', 'genre_str', 'duration_hm', 'duration_hour'),
+    attr=('category_str', 'genre_str', 'duration_hm', 'duration_hour', 'suffix_str'),
     preset=('shortest', 'tier')
 )
+
+SUFFIX_MAP = {
+    'Ⅰ': 'i', 'Ⅱ': 'ii', 'Ⅲ': 'iii', 'Ⅳ': 'iv', 'Ⅴ': 'v', 'Ⅵ': 'vi',
+    'I': 'i', 'II': 'ii', 'III': 'iii', 'IV': 'iv', 'V': 'v', 'VI': 'vi'
+}
+SUFFIX_REGEX = re.compile(r'(Ⅵ|Ⅳ|Ⅴ|Ⅲ|Ⅱ|Ⅰ|VI|IV|V|III|II|I)\s*$', re.IGNORECASE)
 
 
 def crop_suffix_image(image, area):
@@ -275,10 +283,14 @@ class Commission:
         self.genre_str = 'unknown'
         self.duration_hour = 'unknown'
         self.duration_hm = 'unknown'
+        self.suffix_str = 'unknown'
         if self.valid:
             self.category_str, self.genre_str = self.genre.split('_', 1)
             self.duration_hour = str(int(self.duration.total_seconds() / 36) / 100).strip('.0')
             self.duration_hm = str(self.duration).rsplit(':', 1)[0]
+            match = SUFFIX_REGEX.search(self.name)
+            if match:
+                self.suffix_str = SUFFIX_MAP.get(match.group(1).upper(), 'unknown')
 
     @property
     def is_gem_commission(self):
