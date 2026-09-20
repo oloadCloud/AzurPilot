@@ -364,89 +364,25 @@ class AzurLaneAutoScript:
 
     def _try_restart_emulator(self):
         """
-        尝试重启模拟器。永不放弃，一直重试。
-
-        不再受 Error_AdbOfflineRestart 开关限制，
-        超过阈值时仅增加等待间隔，不停止重试。
-        优先使用已缓存的 device 对象，否则根据平台回退创建新实例。
-
-        Returns:
-            bool: 重启成功返回 True，本次重启失败返回 False（调度器会继续尝试）。
+        拦截所有尝试关闭模拟器的越界行为。
+        遇到任何严重异常时，仅停止调度器并发送通知，等待人工介入。
         """
-        self.consecutive_adb_offline += 1
-        limit = int(self.config.Error_AdbOfflineThreshold)
-        logger.warning(f'[Alas] EmulatorNotRunningError: 连续次数 {self.consecutive_adb_offline}/{limit}')
-
-        # 超过阈值时不放弃，仅增加等待间隔后继续重试
-        if self.consecutive_adb_offline > limit:
-            wait_seconds = min(300, 30 * (self.consecutive_adb_offline - limit + 1))
-            logger.warning(
-                f'[Alas] 已超过重启阈值 {limit}，'
-                f'等待 {wait_seconds} 秒后继续重试（永不放弃）'
-            )
-            time.sleep(wait_seconds)
-
-        logger.hr('[Alas] 正在重启模拟器', level=1)
+        logger.critical('拦截到尝试关闭模拟器的越界行为。')
+        logger.critical('AzurPilot 已停止运行，等待人工介入处理。')
         try:
-            # 优先使用已缓存的设备对象
-            device = self.__dict__.get('device', None)
-            if device is None:
-                # connect=False 避免在模拟器离线时先建立 ADB 连接。
-                from module.device.platform import Platform
-                device = Platform(self.config, connect=False)
-
-            # 连续失败够多次就改用深度重启（结束 MuMu 全部进程）
-            deep = self._deep_restart_enabled()
-            if deep:
-                logger.warning(
-                    f'[Alas] 连续重启失败 {self.consecutive_adb_offline} 次，'
-                    f'本次改用深度重启（结束 MuMu 全部进程）'
-                )
-
-            logger.info('[Alas] 正在停止模拟器...')
-            self._emulator_op_with_timeout(
-                device.emulator_stop,
-                timeout=RESTART_EMULATOR_OP_TIMEOUT,
-                operation_name='模拟器停止',
+            handle_notify(
+                self.config.Error_OnePushConfig,
+                title=f"AzurPilot <{self.config_name}> 已停止运行",
+                content=f"<{self.config_name}> 遇到严重异常。已禁止自动重启模拟器，请手动检查游戏与模拟器状态。",
             )
-            time.sleep(5)
-            logger.info('[Alas] 正在启动模拟器...')
-            self._emulator_op_with_timeout(
-                # consecutive_adb_offline 在函数开头已 +1，减 1 得到"本次之前
-                # 已经连续失败过几次"；平台据此选取启动监视的等待时长，
-                # 连续失败越多等得越久（60 → 90 → 120 → 180 → 300 秒），
-                # 重启成功后该计数归零、等待时间随之回到 60 秒
-                partial(
-                    device.emulator_start,
-                    deep=deep,
-                    failures=max(0, self.consecutive_adb_offline - 1),
-                ),
-                timeout=RESTART_EMULATOR_OP_TIMEOUT,
-                operation_name='模拟器启动',
+            notify_webui(
+                self.config_name,
+                title=f"<{self.config_name}> 需要人工介入喵！已停止运行喵！",
+                content=f"遇到严重异常且已禁止重启模拟器，请手动处理喵~",
             )
-            logger.info('[Alas] 模拟器重启完成')
-
-            # 清除 device 缓存，下次访问时重新建立连接
-            if 'device' in self.__dict__:
-                del_cached_property(self, 'device')
-            # 重置连续离线计数
-            self.consecutive_adb_offline = 0
-            return True
-        except EmulatorOpBusy as e:
-            # 上一轮的重启操作还在后台跑（很可能正在冷启动模拟器）。
-            # 此时既不能停也不能再启——那会把正在进行的启动打断，正是
-            # "模拟器窗口一直卡在加载、永远起不来"的成因。放弃本轮即可，
-            # 后台那次操作结束后，下一轮调度自然会接手。
-            logger.warning(f'[Alas] 上一轮模拟器重启仍在进行，放弃本轮重启：{e}')
-            return False
-        except Exception as e:
-            logger.exception_context(
-                title='重启模拟器失败',
-                exc=e,
-                impact='模拟器仍可能处于离线状态，调度器将继续尝试。',
-                action='检查模拟器进程权限、ADB 服务和模拟器管理配置。',
-            )
-            return False
+        except Exception:
+            pass
+        exit(1)
 
     def _emulator_op_with_timeout(self, func, *, timeout, operation_name):
         """带硬超时执行模拟器启停操作，防止恢复流程本身卡死。
@@ -2305,8 +2241,6 @@ class AzurLaneAutoScript:
                         title=f"诶呀！{self.config_name}出现了问题喵！",
                         content=f"因为 {task} 任务失败次数过多喵！",
                     )
-                    logger.warning("[Alas] 任务连续失败次数过多，正在上报错误日志...")
-                    ApiClient.submit_bug_log(f"AzurPilot <{self.config_name}> crashed\nTask `{task}` failed {failed} or more times.")
                     exit(1)
 
                 if failed >= 3:
@@ -2383,18 +2317,12 @@ class AzurLaneAutoScript:
                 )
 
                 # 不再因连续失败次数达到上限而退出，改为持续重试
-                # 上报错误日志（首次失败时上报，避免刷屏）
                 if consecutive_global_failures == 1:
                     try:
                         self.save_error_log()
-                        logger.warning("[Alas] 首次全局异常，正在上报错误日志...")
-                        ApiClient.submit_bug_log(
-                            f"AzurPilot <{self.config_name}> 调度器发生异常。\n"
-                            f"调度器将自动重试恢复（永不退出）。\n"
-                            f"{traceback.format_exc()}"
-                        )
+                        logger.warning("[Alas] 首次全局异常，已保存本地错误日志")
                     except Exception as report_e:
-                        logger.warning(f'[Alas] 错误日志上报失败: {report_e}')
+                        logger.warning(f'[Alas] 保存错误日志失败: {report_e}')
 
                 # 尝试重启模拟器（始终尝试，永不放弃）
                 logger.warning("[Alas] 尝试通过重启模拟器 + 强制执行 RESTART 任务来恢复...")

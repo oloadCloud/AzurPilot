@@ -814,72 +814,9 @@ class PlatformWindows(PlatformBase, EmulatorManager):
 
     @emulator_op_exclusive('启动模拟器')
     def emulator_start(self, deep=False, failures=0):
-        """
-        启动模拟器，尝试一次。
-
-        不在一次调用里连试多次：重试交给调用方按调度轮次进行，等待时间随之
-        逐级放宽。好设备通常 60 秒内就能起来，没必要一上来就等几分钟；持续
-        起不来时才靠 EMULATOR_START_WATCH_TIMEOUTS 逐级加长。
-
-        整个启停过程持有模拟器启停锁（见 emulator_op_exclusive）：
-        若已有启停操作在跑，直接抛 EmulatorOpBusy，不做任何动作——
-        这正是避免"刚启动就被另一个线程关掉"的关键。
-
-        Args:
-            deep (bool): 是否执行深度重启（结束 MuMu 全部进程，含后台服务与
-                虚拟机）。仅由调用方在「连续重启都失败」时置为 True；
-                非 MuMu12 平台忽略此参数。
-            failures (int): 本次尝试之前已经连续失败过几次，用来选取启动
-                监视的等待时长；非 MuMu12 平台忽略。
-
-        Returns:
-            bool: True 表示模拟器已上线。
-        """
-        logger.hr('模拟器启动', level=1)
-
-        watch_timeout = EMULATOR_START_WATCH_TIMEOUTS[
-            min(max(failures, 0), len(EMULATOR_START_WATCH_TIMEOUTS) - 1)
-        ]
-
-        # 检查是否为 MuMuPlayer12，添加实例查找失败的处理逻辑
-        emulator_type = getattr(self.config, 'EmulatorInfo_Emulator', '')
-        is_mumu12 = emulator_type == 'MuMuPlayer12' or (
-            hasattr(self, '_emulator_instance') and
-            self._emulator_instance and
-            self._emulator_instance.type == 'MuMuPlayer12'
-        )
-
-        # 先停止（MuMu12 已使用同步执行确保关闭完成）
-        if not self._emulator_function_wrapper(self._emulator_stop):
-            return False
-
-        # MuMu12: 清场并确认实例真的停下来了再启动
-        if is_mumu12:
-            index = self.emulator_instance.MuMuPlayer12_id
-            exe = self.emulator_instance.emulator.path
-            if deep:
-                # 深度重启：结束 MuMu 全部进程（不检查多开）
-                self._deep_clean_mumu12(exe)
-            else:
-                # 清理僵死的启动器/播放器进程（多开时自动跳过，见方法注释）
-                self._clean_mumu12_residue(exe, index)
-            # shutdown 是异步的，必须确认实例真的停了再启动，
-            # 否则启动请求会被吞掉（命令报成功、实例起不来）
-            self._mumu12_wait_stopped(exe, index)
-
-        # 再启动
-        if not self._emulator_function_wrapper(self._emulator_start):
-            logger.error('[设备-Windows] 启动模拟器命令失败')
-            return False
-
-        if self.emulator_start_watch(timeout=watch_timeout):
-            return True
-
-        logger.warning(
-            f'[设备-Windows] 模拟器启动监视失败（已等待 {watch_timeout} 秒）。'
-            f'本轮不再重试，交给调度器下一轮带着更长的等待时间重来'
-        )
-        return False
+        """禁止启动模拟器。"""
+        logger.warning('[设备-Windows] 已禁止 AzurPilot 自动启动模拟器，请手动启动')
+        exit(1)
 
     @emulator_op_exclusive('停止模拟器')
     def emulator_stop(self):
