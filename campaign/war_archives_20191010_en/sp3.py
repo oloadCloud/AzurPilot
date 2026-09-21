@@ -43,7 +43,7 @@ A5, B5, C5, D5, E5, F5, G5, H5, I5, J5, \
 A6, B6, C6, D6, E6, F6, G6, H6, I6, J6, \
 A7, B7, C7, D7, E7, F7, G7, H7, I7, J7, \
     = MAP.flatten()
-
+ROAD_MAIN = RoadGrids([[C3, E6, F7], [F1, G2, H4, G5], [B4, I5]])
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
@@ -59,7 +59,14 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
 
     def battle_0(self):
-        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
+        if self.clear_potential_roadblocks([ROAD_MAIN], strongest=True):
+            return True
+
+        return self.battle_default()
+
+    def battle_3(self):
+        self.clear_all_mystery()
+        if self.clear_potential_roadblocks([ROAD_MAIN], strongest=True):
             return True
 
         return self.battle_default()
