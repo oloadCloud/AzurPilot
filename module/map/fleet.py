@@ -65,7 +65,8 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
     @property
     def fleet_1(self):
         if self.fleet_current_index != 1:
-            self.fleet_ensure(index=1)
+            if not (self.config.Campaign_BossAutoSearch and hasattr(self, 'map') and self.map.select(is_boss=True)):
+                self.fleet_ensure(index=1)
         return self
 
     @fleet_1.setter
@@ -76,7 +77,8 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
     def fleet_2(self):
         if self.config.FLEET_2:
             if self.fleet_current_index != 2:
-                self.fleet_ensure(index=2)
+                if not (self.config.Campaign_BossAutoSearch and hasattr(self, 'map') and self.map.select(is_boss=True)):
+                    self.fleet_ensure(index=2)
         return self
 
     @fleet_2.setter
@@ -118,6 +120,21 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
             return 2
         else:
             return 1
+
+    @property
+    def is_boss_stage(self):
+        """
+        判断当前战斗场数是否已经达到 BOSS 战
+        """
+        try:
+            if not hasattr(self, 'map') or not hasattr(self.map, 'spawn_data'):
+                return False
+            for data in self.map.spawn_data:
+                if data.get('battle') == self.battle_count:
+                    return data.get('boss', 0) > 0
+        except Exception:
+            pass
+        return False
 
     @property
     def fleet_step(self):
@@ -585,6 +602,16 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
         logger.info(f'[地图-潜艇] 潜艇位置: {location2node(self.fleet_submarine_location)}')
 
     def full_scan(self, queue=None, must_scan=None, mode='normal'):
+        if self.config.Campaign_BossAutoSearch and self.is_boss_stage:
+            logger.info('已启用自律寻敌清除Boss且已处于Boss战，预设Boss生成以跳过地图扫描')
+            boss_grids = self.map.select(may_boss=True)
+            if boss_grids:
+                for grid in boss_grids:
+                    grid.is_boss = True
+                    grid.is_enemy = True
+                logger.info(f'预设Boss位于: {boss_grids}')
+            return
+        
         if self.config.MAP_HAS_DECOY_ENEMY and mode == 'normal':
             mode = 'decoy'
         super().full_scan(
@@ -1120,6 +1147,10 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
         Args:
             preset (tuple): 预设的滑动偏移量 (x, y)。
         """
+        if self.config.Campaign_BossAutoSearch:
+            logger.info('已启用自律寻敌清除Boss，跳过摄像机重新聚焦')
+            return
+
         camera = self.camera
         if preset is None:
             preset = self.config.MAP_BOSS_APPEAR_REFOCUS_SWIPE

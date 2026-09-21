@@ -626,6 +626,10 @@ class ConfigGenerator:
         self.insert_event()
         self.insert_package()
         self.insert_server()
+        for path, value in list(deep_iter(self.args, depth=3)):
+            if isinstance(value, dict) and 'display' in value:
+                if value['display'] is None:
+                    value.pop('display')
         write_file(filepath_args(), self.args)
         write_file(filepath_args('menu'), self.menu)
         self.generate_code()

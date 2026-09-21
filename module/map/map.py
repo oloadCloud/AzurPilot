@@ -26,6 +26,7 @@ from module.logger import logger
 from module.map.fleet import Fleet
 from module.map.map_grids import RoadGrids, SelectedGrids
 from module.map_detection.grid_info import GridInfo
+from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
 
 # 敌人过滤器
 ENEMY_FILTER = Filter(regex=re.compile('^(.*?)$'), attr=('str',))
@@ -343,12 +344,23 @@ class Map(Fleet):
         return False
 
     def clear_boss(self):
-        """清除 Boss。此方法已弃用，虽然在简单地图中仍然有效。
+        """清除 Boss。
         复杂地图推荐使用 brute_clear_boss。
+        允许使用'自律寻敌'一键清除 Boss，避免低效的地图搜索和Boss图标遮挡。
 
         Returns:
             bool: 是否成功清除 Boss。
         """
+        if self.config.Campaign_BossAutoSearch and self.appear(AUTO_SEARCH_MAP_OPTION_OFF, offset=(5, 5)):
+            logger.hr('自律寻敌清除Boss')
+            self.device.click(AUTO_SEARCH_MAP_OPTION_OFF)
+            if self.config.FLEET_2:
+                fleet_index = 3 - self.config.FLEET_BOSS if self.fleets_reversed else self.config.FLEET_BOSS
+            else:
+                fleet_index = 1
+            self.combat(expected_end='in_stage', fleet_index=fleet_index)
+            return True
+            
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
         logger.info('[地图-Boss] 是否Boss: %s' % grids)

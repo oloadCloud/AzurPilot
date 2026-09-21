@@ -1359,6 +1359,10 @@
       "name": "Use auto-search",
       "help": ""
     },
+    "BossAutoSearch": {
+      "name": "Use Auto-Search for BOSS only",
+      "help": "In non-Auto-Search mode, only click the Auto-Search button during BOSS battle to let the game handle it automatically. This avoids inefficient map searching and issues with the BOSS icon being obscured."
+    },
     "Use2xBook": {
       "name": "Use high-efficiency combat manual",
       "help": "Double oil consumption, double drop settlement"

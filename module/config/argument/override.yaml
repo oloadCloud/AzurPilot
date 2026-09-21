@@ -7,10 +7,11 @@
 Restart:
   Scheduler:
     Enable:
-      type: state
-      value: true
-      option: [true]
-      option_bold: [true]
+      type: checkbox
+      value: false
+      option: [true, false]
+      option_bold: [false]
+      display: null
     SuccessInterval: 0
     FailureInterval: 0
     ServerUpdate: 00:00
@@ -97,6 +98,8 @@ Ambush11:
     UseClearMode: false
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   StopCondition:
@@ -220,6 +223,8 @@ Raid:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   StopCondition:
@@ -303,6 +308,8 @@ RaidDaily:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   StopCondition:
@@ -341,6 +348,8 @@ Coalition:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   Coalition:
@@ -376,6 +385,8 @@ CoalitionScuttle:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   Coalition:
@@ -398,6 +409,8 @@ CoalitionSp:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   Coalition:
@@ -426,6 +439,8 @@ CoalitionSp:
     UseClearMode: true
     UseFleetLock: true
     UseAutoSearch: false
+    BossAutoSearch:
+        display: hide
     Use2xBook: false
     AmbushEvade: true
   Coalition:
@@ -484,7 +499,9 @@ Guild:
   Scheduler:
     SuccessInterval: 30
     FailureInterval: 30
-    ServerUpdate: 00:00, 06:00, 12:00, 18:00
+    ServerUpdate:
+        value: "00:00, 06:00, 12:00, 18:00"
+        display: null
 Reward:
   Scheduler:
     SuccessInterval: 120-240
