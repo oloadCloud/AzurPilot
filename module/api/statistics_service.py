@@ -3,10 +3,54 @@ import math
 import threading
 from datetime import datetime, timedelta
 
+import os
 from module.api.protocol import ApiError
 
 
 _loot_lock = threading.Lock()
+
+
+def get_statistics_fingerprint(instance: str) -> str:
+    """获取当前实例统计数据的轻量级指纹。
+
+    检测 SQLite 本地快照库、CL1 记录库、舰船统计文件以及配置文件修改时间，
+    用于 WebSocket 会话高效判断后端统计数据是否有更新。
+    """
+    parts = []
+    # 1. 资源快照数据库 (azurstats_local.db)
+    res_db = './config/azurstats_local.db'
+    try:
+        stat = os.stat(res_db)
+        parts.append(f"res:{stat.st_mtime_ns}:{stat.st_size}")
+    except OSError:
+        parts.append("res:none")
+
+    # 2. 实例配置文件 (config/<instance>.json)
+    cfg_file = f'./config/{instance}.json'
+    try:
+        stat = os.stat(cfg_file)
+        parts.append(f"cfg:{stat.st_mtime_ns}")
+    except OSError:
+        parts.append("cfg:none")
+
+    # 3. 大世界与委托记录库 (cl1_record.db)
+    cl1_db = './config/cl1_record.db'
+    try:
+        stat = os.stat(cl1_db)
+        parts.append(f"cl1:{stat.st_mtime_ns}")
+    except OSError:
+        parts.append("cl1:none")
+
+    # 4. 舰船经验统计文件 (log/ship_exp_stats.json)
+    ship_file = './log/ship_exp_stats.json'
+    try:
+        stat = os.stat(ship_file)
+        parts.append(f"ship:{stat.st_mtime_ns}")
+    except OSError:
+        parts.append("ship:none")
+
+    return ';'.join(parts)
+
 
 
 def refresh_loot(configs, instance):
@@ -14,7 +58,7 @@ def refresh_loot(configs, instance):
     configs.path(instance)
     from module.statistics.azurstats import AzurStats
     with _loot_lock:
-        AzurStats.get_meowofficer_farming()
+        AzurStats.get_meowofficer_farming(instance=instance)
     return {'refreshed': True}
 
 
@@ -49,7 +93,7 @@ def series(rows, key, label):
     return {'key': key, 'label': label, 'points': points}
 
 
-def report(configs, instance, category, month, days, period):
+def report(configs, instance, category, month, days, period, research_series=0):
     configs.path(instance)
     now = datetime.now()
     try:
@@ -168,13 +212,45 @@ def report(configs, instance, category, month, days, period):
             f"上次检测：{data.get('last_check_time', '尚未检测')}；舰队：{data.get('fleet_index', '—')}。"))
         daily = [{'ts': key, **value} for key, value in sorted(data.get('daily_stats', {}).items())]
         result['series'] = [series(daily, 'total_exp_gained', '每日经验'), series(daily, 'battle_count', '每日战斗'), series(daily, 'total_run_time', '每日运行秒数')]
+    elif category == 'research':
+        from module.statistics.research_stats import collect, RARITY_LABELS
+        summary = collect(instance, days=days, series=research_series)
+        if not summary['available']:
+            # 走表格的 note 而不是 notes：前端只渲染 tables，notes 仅在导出 CSV 时用到，
+            # 放在那里用户界面上什么都看不到（会以为功能坏了）。
+            result['tables'].append(table(
+                '科研掉落', ['图标', '物品', '稀有度', '数量', '获得次数'], [],
+                note='还没有科研掉落记录。统计在领奖时自动完成：'
+                     '把「科研截图」设为「保存」或「上传」即可（两者都会统计，'
+                     '区别只是要不要把截图落盘）。'))
+            return result
+        metric('掉落记录', summary['records'], '次')
+        metric('物品种类', len(summary['items']), '种')
+        metric('掉落总数', summary['total'])
+        rows = [
+            [f'research:{item["name"]}', item['zh'],
+             RARITY_LABELS.get(item.get('rarity'), '—'), item['amount'], item['count']]
+            for item in summary['items']
+        ]
+        result['tables'].append(table(
+            f'第 {summary["series"]} 期掉落',
+            ['图标', '物品', '稀有度', '数量', '获得次数'],
+            rows,
+            note='只统计彩装备、彩图纸、金图纸与心智单元；其余物品照常入库但不在此展示。'
+                 '图标暂用当前物品模板。',
+            default_sort={'index': 3, 'descending': True},
+        ))
+        result['notes'].append(
+            f'当前展示第 {summary["series"]} 期；有记录的期数：'
+            + ('、'.join(f'第 {item} 期' for item in summary['available']) if summary['available'] else '无'))
     elif category == 'loot':
         from module.statistics.azurstats import AzurStats
         rows = []
         with _loot_lock:
-            cached = AzurStats.load_meowofficer_farming()
+            cached = AzurStats.load_meowofficer_farming(instance=instance)
         for row in cached:
             if row[2] > 0:
                 rows.append([int(row[0]), datetime.fromtimestamp(row[1]).isoformat(sep=' '), float(row[2]), *[round(float(value), 4) for value in row[3:]]])
         result['tables'].append(table('短猫掉落收益', AzurStats.meowofficer_farming_labels, rows))
+        result['notes'].append('仅统计当前实例的掉落；旧记录缺少实例信息，作为历史共享数据保留，不计入当前实例。')
     return result

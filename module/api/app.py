@@ -42,7 +42,12 @@ def create_app(*, root: Path = ROOT, password=None, manage_runtime=True, mount_m
             if manage_runtime:
                 from module.api.lifecycle import startup
                 from module.runtime.deploy_settings import parse_run_config
+                from module.runtime.startup_memory import consume_update_restart, startup_runs
+                update_restart = consume_update_restart()
                 runs = args.run or parse_run_config(State.deploy_config.Run)
+                if not args.run:
+                    # --run 是显式清单，不叠加记忆。
+                    runs = startup_runs(runs, update_restart=update_restart)
                 await asyncio.to_thread(startup, runs)
                 if State.deploy_config.DiscordRichPresence:
                     try:
@@ -89,6 +94,11 @@ def create_app(*, root: Path = ROOT, password=None, manage_runtime=True, mount_m
               WebSocketRoute('/api/v1/ws', gateway.endpoint)]
     if (dist / 'assets').is_dir():
         routes.append(Mount('/assets', StaticFiles(directory=dist / 'assets')))
+    # 科研掉落的物品图标直接用仓库里的模板图，不走前端构建，
+    # 这样补了新模板立刻生效，不用重新 npm build。
+    research_items = root / 'assets' / 'stats' / 'research_items'
+    if research_items.is_dir():
+        routes.append(Mount('/research-items', StaticFiles(directory=research_items)))
     if mount_mcp:
         from mcp_server_sse import create_app as create_mcp_app, configure_auth
         configure_auth(password, public_bind=bool(password))

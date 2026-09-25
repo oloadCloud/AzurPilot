@@ -91,10 +91,12 @@ class StatisticsParams(InstanceParams):
 
 
 class StatisticsReportParams(InstanceParams):
-    category: Literal['resources', 'action', 'opsi', 'commission', 'ships', 'loot'] = 'resources'
+    category: Literal['resources', 'action', 'opsi', 'commission', 'ships', 'loot', 'research'] = 'resources'
     month: StrictStr | None = Field(default=None, pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
     days: StrictInt = Field(default=7, ge=1, le=365)
     period: Literal['day', 'week', 'month'] = 'month'
+    # 科研统计专用：只看某一期，0 表示最新有记录的一期
+    series: StrictInt = Field(default=0, ge=0, le=20)
 
 
 class MeowfficerScoreReportParams(InstanceParams):
@@ -117,7 +119,8 @@ class CommitsParams(Params):
 
 
 class StartupParams(InstanceParams):
-    enabled: StrictBool
+    enabled: StrictBool | None = None
+    remember: StrictBool | None = None
 
 
 def response(request_id, result):

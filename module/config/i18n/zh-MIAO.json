@@ -111,8 +111,8 @@
       "help": "拿起相机拍下最美的瞬间喵，模特队的胜利！(ﾉ◕ヮ◕)ﾉ"
     },
     "CoalitionScuttle": {
-      "name": "Task.CoalitionScuttle.name",
-      "help": "Task.CoalitionScuttle.help"
+      "name": "联盟沉船喵",
+      "help": "联盟活动中舰船被击沉后刷取好感度喵，建议多队出击、第一队就沉，建议看相关教程喵"
     },
     "MaritimeEscort": {
       "name": "商路护航喵",
@@ -736,9 +736,24 @@
       "name": "敏感任务出错禁止重启",
       "help": "隐秘、深渊、跨月每日出错时停止AzurPilot而不是重启喵，避免损失。"
     },
-    "SaveErrorCount": {
-      "name": "错误日志保留数",
-      "help": "超过上限的日志会被清理喵，0或负数无限喵。"
+    "SaveErrorRetentionDays": {
+      "name": "错误日志过期天数喵",
+      "help": "超过天数的错误现场按下面的方式处理喵\n0 = 不清理喵"
+    },
+    "SaveErrorBackUpMethod": {
+      "name": "过期错误日志处理方式喵",
+      "help": "备份到./log/error/<实例名>/bak 喵",
+      "delete": "删除喵",
+      "zip": "压缩备份喵",
+      "copy": "拷贝备份喵"
+    },
+    "SaveErrorZipMethod": {
+      "name": "压缩格式喵",
+      "help": "",
+      "bz2": "bz2喵",
+      "gzip": "gzip喵",
+      "xz": "xz喵",
+      "zip": "zip喵"
     },
     "OnePushConfig": {
       "name": "错误推送通知喵",
@@ -765,24 +780,24 @@
       "help": "连续多少次触发重启喵。"
     },
     "WatchdogEnable": {
-      "name": "Error.WatchdogEnable.name",
-      "help": "Error.WatchdogEnable.help"
+      "name": "启用看门狗总开关喵",
+      "help": "看门狗总开关喵。关掉之后，所有看门狗检测都不生效；开启后，还要单独打开下面的子开关喵。默认关闭。"
     },
     "WatchdogTaskEnable": {
-      "name": "Error.WatchdogTaskEnable.name",
-      "help": "Error.WatchdogTaskEnable.help"
+      "name": "任务跑太久自动重启喵",
+      "help": "开了之后喵，如果某个任务跑得太久（比如卡在剧情跳不过去、地图走不动了），就会自动重启模拟器把它打断。\n得先开上面的「看门狗总开关」才管用喵。默认关。"
     },
     "WatchdogTaskTimeout": {
-      "name": "Error.WatchdogTaskTimeout.name",
-      "help": "Error.WatchdogTaskTimeout.help"
+      "name": "任务卡死保护超时喵（分钟）",
+      "help": "单个任务运行超过指定时间后没切换其他任务（一般委托科研切换后会重新计算），就判定任务逻辑死循环（如剧情无法跳过、寻路死循环等）喵，强制重启模拟器以中断任务。\n0 表示禁用；99999 表示几乎无限制。\n默认 120 分钟（2 小时）。"
     },
     "RestartOperationTimeoutEnable": {
-      "name": "Error.RestartOperationTimeoutEnable.name",
-      "help": "Error.RestartOperationTimeoutEnable.help"
+      "name": "重启游戏保护开关喵",
+      "help": ""
     },
     "RestartOperationTimeout": {
-      "name": "Error.RestartOperationTimeout.name",
-      "help": "Error.RestartOperationTimeout.help"
+      "name": "重启游戏卡多久算死喵（秒）",
+      "help": "重启游戏时，关游戏或开游戏这步卡住超过这个秒数，就当模拟器卡死了喵，直接去重启模拟器。\n得先开上面的「重启游戏超时保护」才管用喵。\n默认 120 秒。"
     },
     "LlmAnalysis": {
       "name": "启用 LLM 错误分析喵",
@@ -936,7 +951,22 @@
     },
     "RetentionDays": {
       "name": "截图保留天数喵",
-      "help": "掉落记录截图超过这么多天就自动删掉喵~\n0 = 不按天数删（委托收益截图还是只留最近 50 张喵）"
+      "help": "掉落记录截图超过这么多天就按下面的方式处理喵~\n0 = 不按天数处理（委托收益截图还是只留最近 50 张喵）"
+    },
+    "BackUpMethod": {
+      "name": "过期截图处理方式喵",
+      "help": "备份到保存目录下的 bak 资料夹喵（委托收益截图是各自实例目录下的 bak 喵）",
+      "delete": "删除喵",
+      "zip": "压缩备份喵",
+      "copy": "拷贝备份喵"
+    },
+    "ZipMethod": {
+      "name": "压缩格式喵",
+      "help": "",
+      "bz2": "bz2喵",
+      "gzip": "gzip喵",
+      "xz": "xz喵",
+      "zip": "zip喵"
     },
     "AzurStatsID": {
       "name": "AzurStat ID 喵",
@@ -1111,7 +1141,7 @@
     },
     "TaskPriorityAdjustment": {
       "name": "任务优先级调整喵",
-      "help": "拖动任务行调整调度优先级喵，越靠上越先执行喵。新增任务会按照内置默认优先级自动插入到合适位置喵。"
+      "help": "按从上到下的顺序填写任务名喵，越靠前越先执行喵；一行一个，也可以用 > 分隔喵。新增任务会按照内置默认优先级自动插入到合适位置喵~"
     }
   },
   "OneClickRetire": {
@@ -1608,8 +1638,8 @@
       "fleet1_standby_fleet2_all": "一队待机 二队全清喵"
     },
     "SkipPreparation": {
-      "name": "Fleet.SkipPreparation.name",
-      "help": "Fleet.SkipPreparation.help"
+      "name": "跳过编队检测喵",
+      "help": "开启后会跳过编队界面的舰队选择步骤喵，直接使用游戏内当前预选的舰队出击\n适用于舰队槽位未完全解锁的账号，避免下拉菜单检测卡死\n开启前请确保游戏内已手动选好舰队1和舰队2喵"
     }
   },
   "Submarine": {
@@ -1649,8 +1679,8 @@
       "use_open_ocean_support": "使用远洋支援喵"
     },
     "AdvancedConfig": {
-      "name": "Submarine.AdvancedConfig.name",
-      "help": "Submarine.AdvancedConfig.help"
+      "name": "高级配置喵",
+      "help": "高级配置当且仅当潜艇出击方案选择“高级”时生效喵。配置严格遵循 YAML 格式喵。\n\n【基础参数】\n- ammo: 潜艇总弹药数。\n- support: 远洋支援可用次数。\n- range: 狩猎范围，由 7 个长度为 7 的字符串组成。\"N\" 代表覆盖范围；\"O\" 代表未覆盖范围；\"H\" 代表潜艇位置，只出现在第4行第4列（中心位置）。\n\n【规则 rules】\n- 战斗索引: battle_0（所有战斗）、battle_N（第 N 场战斗，1 起始）、battle_-N（倒数第 N 场战斗）。某场战斗如匹配多条规则则会按照“召唤 > 狩猎 > 不出击”的方式出击。\n- type: 出击类型。hunt（狩猎）、call（召唤）。\n- condition: 触发条件（省略则无条件出击）。\n    ammo: 弹药条件表达式，如 \">2\"、\">=2\"、\"=3\"。支持的运算符：\">\"、\">=\"、\"<\"、\"<=\"、\"=\"、\"!=\"。\n    support: 远洋支援次数条件表达式，如 \">2\"、\">=2\"、\"=3\"。支持的运算符：\">\"、\">=\"、\"<\"、\"<=\"、\"=\"、\"!=\"。\n    enemy: 目标敌舰类型列表，采用规模+舰种的方式表示。如 \"3M\" 代表大型主力舰队。支持通配符 \"*\"，如 \"3*\" 代表所有大型舰队，\"*T\" 代表所有运输船。\n    - 规模：1：小型舰队；2：中型舰队；3：大型舰队；0：未知规模。\n    - 舰种：L：侦察舰队；M：主力舰队；C：航空舰队；T：运输船；E：未知类型。\n    in_range（true/false）: 是否在狩猎范围内，如不在狩猎范围内召唤潜艇会消耗远洋支援次数。\n- move: 范围不足时是否消耗石油移动潜艇到能覆盖目标的油耗最小处（true/false），如果远洋支援次数有剩余则不会移动而是使用远洋支援。"
     }
   },
   "Emotion": {
@@ -1850,6 +1880,10 @@
       "name": "刷紧急委托喵",
       "help": "警告: 少量钻石获取方式，非高效手段。萌新别迷信低耗，角色养成才重要。阵形成型玩家可获取额外魔方，钻石当副产品喵。 旗舰32级后更换旗舰。委托油比 A3 > A1 > 2-4 > 2-1，活动图更好。一队完成战斗，前排百级零破驱逐输出装，后排33级以下零破白航母。二队跨队支援。 无法设置舰队职能时：有错误推送就停止任务并通知，否则直接停止AzurPilot，防石油消耗。"
     },
+    "EventFallbackStage": {
+      "name": "活动结束后关卡",
+      "help": "活动 PT 达到上限、时间到期或活动不可用时，切换到指定主线关卡继续运行喵。默认 2-4；填 0 停止任务并保留活动关卡喵。仅对当前选择活动关卡的任务生效喵。"
+    },
     "ChangeFlagship": {
       "name": "更换旗舰",
       "help": "旗舰>=32级或红脸时更换。找1-31白航母，退役换下的旗舰。记录并更换装备喵。 (´・ω・`)",
@@ -1945,11 +1979,11 @@
     },
     "PtLimit": {
       "name": "活动 PT 限制",
-      "help": "累计PT达设定值禁所有活动任务，0不限制。自律寻敌不即时触发喵。开启后无需计算总次数。"
+      "help": "累计PT达设定值禁所有活动任务，0不限制。自律寻敌不即时触发喵。开启后无需计算总次数。\n紧急委托和三油低耗按各自的“活动结束后关卡”设置切换主线，填 0 则停止喵。"
     },
     "TimeLimit": {
       "name": "活动时间限制",
-      "help": "超过本地时间禁活动任务，'2020-01-01 00:00:00'为不限，触发后重置。防止活动结束忘关喵。"
+      "help": "超过本地时间禁活动任务，'2023-01-01 00:00:00'为不限，触发后重置。防止活动结束忘关喵。\n紧急委托和三油低耗按各自的“活动结束后关卡”设置切换主线，填 0 则停止喵。"
     }
   },
   "TaskBalancer": {
@@ -2082,12 +2116,12 @@
   },
   "CoalitionScuttle": {
     "_info": {
-      "name": "CoalitionScuttle._info.name",
-      "help": "CoalitionScuttle._info.help"
+      "name": "联盟沉船喵",
+      "help": "联盟活动沉船设置喵，选择被击沉的舰船位置"
     },
     "Sacrifice": {
-      "name": "CoalitionScuttle.Sacrifice.name",
-      "help": "CoalitionScuttle.Sacrifice.help",
+      "name": "牺牲船位置喵",
+      "help": "选择要被击沉的舰船位置喵，前排/旗舰/前排+旗舰",
       "vanguard": "vanguard",
       "flagship": "flagship",
       "vanguard_flagship": "vanguard_flagship"
@@ -3795,22 +3829,22 @@
       "help": "隐秘海域和深渊坐标全部打完后，智能调度会延迟指定天数再检查，期间直接跳过，补黄币跑得更快喵~。0 表示每轮都检查 (´・ω・`)。大世界每月重置会刷新它们，重置后会照常检查喵~"
     },
     "MonthEndActionPointCleanupEnable": {
-      "name": "OpsiScheduling.MonthEndActionPointCleanupEnable.name",
-      "help": "OpsiScheduling.MonthEndActionPointCleanupEnable.help",
+      "name": "启用月末清理行动力喵",
+      "help": "是否启用月末清理行动力功能喵。开启后，当距大世界重置剩余天数小于等于「月末清理行动力天数」时，启动月末清理模式消耗行动力喵。",
       "True": "True",
       "False": "False"
     },
     "MonthEndActionPointCleanupDays": {
-      "name": "OpsiScheduling.MonthEndActionPointCleanupDays.name",
-      "help": "OpsiScheduling.MonthEndActionPointCleanupDays.help"
+      "name": "月末清理行动力天数喵",
+      "help": "距大世界重置剩余天数小于等于此值时，启动月末清理行动力模式喵。0 表示禁用。启用后会循环执行短猫相接、商店购买、隐秘海域、深渊坐标消耗行动力，首次运行时还会调出塞壬要塞喵。"
     },
     "MonthEndActionPointPreserve": {
-      "name": "OpsiScheduling.MonthEndActionPointPreserve.name",
-      "help": "OpsiScheduling.MonthEndActionPointPreserve.help"
+      "name": "月末清理行动力保留喵",
+      "help": "月末清理行动力模式下的行动力保留值喵。如果启用跨月每日任务，最低预留 200 行动力；当此值大于最低预留时使用此值喵。"
     },
     "MonthEndShopPurchase": {
-      "name": "OpsiScheduling.MonthEndShopPurchase.name",
-      "help": "OpsiScheduling.MonthEndShopPurchase.help",
+      "name": "月末清理商店购买喵",
+      "help": "月末清理行动力时是否执行大世界商店购买喵。关闭后，月末清理循环将跳过商店购买步骤喵。",
       "True": "True",
       "False": "False"
     }
@@ -6248,8 +6282,8 @@
       "help": "每隔指定时间自动重启模拟器，防内存泄漏卡顿，等当前任务完成再重启喵。 (´・ω・`)"
     },
     "ForceScheduledRestart": {
-      "name": "EmulatorManagement.ForceScheduledRestart.name",
-      "help": "EmulatorManagement.ForceScheduledRestart.help"
+      "name": "强制定时重启喵（不等任务）",
+      "help": "开了之后喵，到点就直接重启模拟器，不等当前任务跑完。\n不过如果正在跑重要任务（敏感任务），还是会等它跑完再重启喵。\n得先开上面的「定时重启模拟器」才管用。默认关喵。"
     },
     "RestartIntervalHours": {
       "name": "重启间隔",

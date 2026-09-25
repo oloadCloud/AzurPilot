@@ -2,7 +2,9 @@
    余量固定 4px，标签因此几乎占满整条栏高，文字不会被大边框围住。 */
 :root[data-tab-size='md'] {--row-scale: 1; --row-pad: calc(2px + (30px * 1) / 8)}
 :root[data-tab-size='lg'] {--row-scale: 1.24; --row-pad: calc(2px + (30px * 1.24) / 8)}
+:root[data-tab-size='xl'] {--row-scale: 1.55; --row-pad: calc(2px + (30px * 1.55) / 8)}
 :root[data-tab-size='sm'] {--row-scale: .78; --row-pad: calc(2px + (30px * .78) / 8)}
+:root[data-tab-size='xs'] {--row-scale: .62; --row-pad: calc(2px + (30px * .62) / 8)}
 :root {--instance-tab-height: calc(30px * var(--row-scale, 1)); --instance-tab-font: calc(var(--instance-tab-height) * .4); --instance-tab-pad: calc(9px * var(--row-scale, 1)); --instance-tab-max: calc(210px * var(--row-scale, 1)); --instance-tab-icon: calc(14px * var(--row-scale, 1)); --instance-tab-gap: 1px; /* 新前端三个主题的标签页是长椭圆（胶囊）形；旧版主题另有规则把它压回 0。 */ --instance-tab-radius: 999px}
 
 .update-notice.sidebar-update-notice {padding: 4px 8px; border-radius: 999px; background: var(--red); color: #fff; font-size: 10px; font-weight: 750; line-height: 1; flex-shrink: 0}
@@ -11,7 +13,7 @@
 .sidebar-brand-left {display: flex; align-items: center; gap: 8px; min-width: 0}
 .sidebar-update-notice span {position: relative; z-index: 1}
 .nav-instance-name {min-width: 0; overflow: hidden; text-overflow: ellipsis}
-.topbar {position: sticky; top: 0; z-index: 30; gap: 16px}
+.topbar {position: sticky; top: 0; z-index: 30; gap: 16px; border-bottom: none !important}
 /* 承载控件的那一行由控件自身撑起，不另外定高：定高会在分页与原模式之间差出 1px。 */
 .breadcrumb {min-width: 0; min-height: var(--instance-tab-height); align-items: center}
 .breadcrumb-current {overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
@@ -72,12 +74,10 @@
 :root[data-tab-size] .app-shell .breadcrumb .topbar-actions:has(> .topbar-actions-buttons:hover) .topbar-actions-buttons > *,
 :root[data-tab-size] .app-shell .breadcrumb .topbar-actions:has(:focus-visible) .topbar-actions-buttons > * {visibility: visible; pointer-events: auto}
 .instance-tab .lucide {width: var(--instance-tab-icon); height: var(--instance-tab-icon)}
-/* 「主页」的文字与它右侧的分隔线跟整行同一比例；字号不只在分页模式生效，
-   否则切模式时「主页」会忽大忽小 —— 与原模式 / 分页模式无关。 */
-/* 「主页」是纯文字链接，默认命中区只有文字那么大（实测 24×16）；给足内边距，
-   让它占满整条行高，整块都可点。 */
-.breadcrumb > a {font-size: var(--instance-tab-font); display: inline-flex; align-items: center; padding: 10px calc(var(--instance-tab-pad) * .6)}
-.breadcrumb > a:hover {color: var(--accent); background: var(--accent-soft); border-radius: var(--theme-radius-control)}
+/* 「主页」的文字与它右侧的分隔线跟整行同一比例；字号不只在分页模式生效。
+   它是纯文字链接，默认命中区只有文字那么大，给足内边距让它占满整条行高。 */
+.breadcrumb .topbar-actions > a {font-size: var(--instance-tab-font); display: inline-flex; align-items: center; padding: 10px calc(var(--instance-tab-pad) * .6)}
+.breadcrumb .topbar-actions > a:hover {color: var(--accent); background: var(--accent-soft); border-radius: var(--theme-radius-control)}
 
 /* 分页模式：实例平铺成一行标签页。留给标签的宽度有下限，所以「主页」与会收缩的页名要能截断，
    而不是把标签挤没。 */
@@ -93,17 +93,25 @@
 .instance-tab:hover {color: var(--accent); background: var(--accent-soft); border-color: var(--border); border-bottom: 0}
 .instance-tab-name {font-size: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
 /* 尺寸与标签页同高，并自己垂直居中：标签条是 stretch 对齐，不写 align-self 这个圆钮会顶对齐。 */
-.instance-tab-create {flex-shrink: 0; align-self: center; width: var(--instance-tab-height); height: var(--instance-tab-height); padding: 0; display: grid; place-items: center; border: 1px dashed var(--border); border-radius: 999px; color: var(--muted); transition: color .15s, border-color .15s}
+.instance-tab-create {flex-shrink: 0; align-self: center; box-sizing: border-box; width: var(--instance-tab-height); height: var(--instance-tab-height); padding: 0; display: grid; place-items: center; border: 1px dashed var(--border); border-radius: 999px; color: var(--muted); transition: color .15s, border-color .15s}
 .instance-tab-create:hover {color: var(--accent); border-color: var(--accent)}
+/* 「+」图标由 JSX 给固定尺寸，这里按标签图标变量覆盖，否则五档缩放时图标不动。 */
+.instance-tab-create > .lucide {width: calc(var(--instance-tab-icon) * .72); height: calc(var(--instance-tab-icon) * .72)}
+/* 按压反馈与主题里其它按钮同一写法（见 apple.css 的 .button:active）；两个创建入口共用。 */
+.instance-tab-create:active:not(:disabled), .instance-create:active:not(:disabled) {filter: brightness(.94)}
 
-/* 标签页里的两格控件位置：左格放状态与启停钮，右格放删除钮，两格同宽，切换时不改标签页宽度。 */
-.instance-tab-cell {position: relative; display: inline-flex; flex-shrink: 0; width: var(--instance-tab-icon); height: var(--instance-tab-icon)}
-.instance-tab-icon {flex-shrink: 0}
+/* 标签页里的两格控件位置：左格放状态与启停钮，右格放删除钮。格子有定宽，悬停切换图标不改标签宽度。
+   左格比标签页里其它图标小一圈：只缩可点范围以减少误触，两枚图标都取同一尺寸，切换时不改变大小。 */
+.instance-tab-cell {position: relative; display: inline-flex; flex-shrink: 0; --tab-cell-icon: calc(var(--instance-tab-icon) * 6 / 7); width: var(--tab-cell-icon); height: var(--tab-cell-icon)}
+/* 状态图标与格子同尺寸；选择器要压过 .instance-tab .lucide（两个类）才生效。 */
+.instance-tab .instance-tab-icon {flex-shrink: 0; width: var(--tab-cell-icon); height: var(--tab-cell-icon)}
 
 /* 左格：平时是状态图标，鼠标压在这一格上时换成启停钮。 */
 .instance-tab-cell:not(.instance-tab-remove):hover .instance-tab-icon {visibility: hidden}
 .instance-tab-cell:not(.instance-tab-remove):hover .instance-tab-power {display: grid}
 .instance-tab-power {position: absolute; inset: 0; display: none; place-items: center; border-radius: 50%; cursor: pointer; color: var(--accent)}
+/* 启停图标与状态图标同尺寸：两态切换时图标不改变大小。 */
+.instance-tab-power > .lucide {width: var(--tab-cell-icon); height: var(--tab-cell-icon)}
 .instance-tab-power:hover {color: var(--surface); background: var(--accent)}
 .instance-tab.running .instance-tab-power {color: var(--red)}
 .instance-tab.running .instance-tab-power:hover {color: var(--surface); background: var(--red)}
@@ -152,11 +160,11 @@
 .home-deck-link:hover {border-color: var(--accent); color: var(--accent)}
 .home-active .wallpaper::after {content: ''; position: absolute; inset: 0; background: linear-gradient(168deg, rgb(0 0 0 / .30), rgb(0 0 0 / .48) 55%, rgb(0 0 0 / .62)); pointer-events: none}.instance-device {display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere}
 .instance-device > span:first-child {text-transform: uppercase; flex-shrink: 0}
-.home-main {min-width: 0; padding: clamp(26px, 3.2vw, 52px) clamp(26px, 3.6vw, 56px); background: var(--bg); color: var(--text)}
+.home-main {min-width: 0; padding: clamp(26px, 3.2vw, 52px) clamp(26px, 3.6vw, 56px); background: var(--bg); color: var(--text); border-bottom-left-radius: var(--theme-radius-panel, 26px)}
 .home-main-heading {display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding-bottom: 22px; border-bottom: 1px solid var(--border); margin-bottom: 24px}
 .home-main-heading h2 {margin: 0; font-size: clamp(22px, 2.2vw, 30px); letter-spacing: -.6px}
 .home-instance-grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 20px; align-content: start}
-.home-instance-grid .instance-card {display: flex; flex-direction: column; min-width: 0; padding: 24px; color: var(--text); text-decoration: none}
+.home-instance-grid .instance-card {display: flex; flex-direction: column; min-width: 0; padding: 24px; color: var(--text); text-decoration: none; border-radius: var(--theme-radius-card, 24px); border-bottom-left-radius: var(--theme-radius-card, 24px)}
 .home-instance-grid .instance-card-heading {display: flex; align-items: center; justify-content: space-between; gap: 12px}
 .home-instance-grid .home-instance-icon {width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px}
 .home-instance-grid .instance-card h3 {margin: 22px 0 10px; font-size: 20px; letter-spacing: -.3px; overflow-wrap: anywhere}
@@ -176,9 +184,12 @@
 [data-theme='minimal'] .main-shell > main:has(> .home-editorial), [data-theme='extreme'] .main-shell > main:has(> .home-editorial) {min-height: calc(var(--viewport-height) - var(--topbar-height))}
 .head-grid {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 24px}
 .head-card {padding: 22px; display: grid; gap: 15px}
-.head-card > span {display: flex; align-items: center; gap: 8px; color: var(--muted)}
-.head-card code {font-size: 13px; overflow-wrap: anywhere; user-select: all}
-.update-summary {display: flex; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 24px; color: var(--muted)}
+.head-card-header {display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap}
+.head-card-header > span, .head-card > span {display: flex; align-items: center; gap: 8px; color: var(--muted)}
+.head-card code {font-family: var(--theme-font-mono, "JetBrains Mono", "JetBrains Mono NL", "Cascadia Code", "Consolas", "Microsoft YaHei", monospace); font-size: 13px; overflow-wrap: anywhere; user-select: all}
+.branch-summary {display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px}
+.commit-panel .panel-heading {flex-wrap: wrap; gap: 12px}
+.update-summary {display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px}
 .update-summary > span {display: flex; align-items: center; gap: 6px}
 .update-summary .update-available {color: var(--accent)}
 .commit-row {display: flex; gap: 16px; padding: 19px 24px; border-top: 1px solid var(--border)}
@@ -188,7 +199,7 @@
 .commit-ref {display: inline-block; font-size: 10px; padding: 0 7px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 5px; margin-left: 9px; white-space: nowrap}
 .commit-ref.upstream {background: var(--accent-soft); color: var(--accent)}
 .commit-meta {display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted); margin-top: 8px}
-.commit-meta code {user-select: all}
+.commit-meta code {font-family: var(--theme-font-mono, "JetBrains Mono", "JetBrains Mono NL", "Cascadia Code", "Consolas", "Microsoft YaHei", monospace); user-select: all}
 .commit-detail details {margin-top: 6px; color: var(--muted); font-size: 12px}
 .commit-detail summary {cursor: pointer}
 .commit-detail pre {white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; color: var(--text)}
@@ -225,7 +236,7 @@
 
 /* 旧版外壳里，内容区那两列（`.instance-page-grid` / `.task-config-legacy`）的高度预算也要跟着这一行走，
    否则它们按旧值算出来的高度会把整壳顶出视口，页面就能滚、接缝就露出来了。 */
-:root[data-tab-size] .app-shell.legacy-shell:has(.instance-tabs) {--legacy-page-nav-height: calc(56px * var(--row-scale, 1))}
+:root[data-tab-size] .app-shell.legacy-shell:has(.topbar-tab-size) {--legacy-page-nav-height: calc(56px * var(--row-scale, 1))}
 
 /* 形状跟着主题家族走：light / dark 是操场形（四角半圆），简约与两个旧版主题保持上方矩形并贴住下方栏（浏览器标签页那样）。 */
 :root[data-theme='minimal'], :root[data-theme='legacy-light'], :root[data-theme='legacy-dark'] {--instance-tab-radius: 0px}

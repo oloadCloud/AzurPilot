@@ -13,7 +13,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {border-color: var(--theme-focus); box-shadow: 0 0 0 3px var(--theme-focus-ring)}
 button:focus-visible, a:focus-visible, summary:focus-visible {outline-color: var(--theme-focus)}
 
-.sidebar, .right-rail, .panel, .resource-card, .summary-metrics section {
+.sidebar, .right-rail, .panel, .resource-card {
   background: var(--theme-glass);
   border-color: var(--theme-glass-edge);
   box-shadow: var(--theme-shadow-panel);
@@ -21,8 +21,15 @@ button:focus-visible, a:focus-visible, summary:focus-visible {outline-color: var
   backdrop-filter: var(--theme-material-filter, none);
 }
 .sidebar {background: var(--theme-sidebar); border-radius: 0 var(--theme-radius-panel) var(--theme-radius-panel) 0}
-.right-rail {border-radius: 0 0 0 var(--theme-radius-panel); box-shadow: var(--theme-shadow-floating), var(--theme-shadow-panel)}
-.panel, .resource-card, .summary-metrics section {border-radius: var(--theme-radius-panel)}
+.right-rail {border-radius: 0 0 0 var(--theme-radius-panel); border-top: 0 !important; box-shadow: var(--theme-shadow-floating)}
+.panel, .resource-card {border-radius: var(--theme-radius-panel)}
+.summary-metrics-panel .summary-metric-card,
+.summary-metrics-panel .summary-metrics section {
+  border-radius: var(--theme-radius-control, 12px);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 .instance-card {border-radius: var(--theme-radius-card)}
 
 .glass-material {background: var(--theme-glass); -webkit-backdrop-filter: var(--theme-chrome-filter, none); backdrop-filter: var(--theme-chrome-filter, none)}
@@ -62,7 +69,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {outline-color: var
 .task-submenu-item.active .task-submenu-dot {box-shadow: none}
 .instance-menu button:hover, .instance-menu button:focus-visible, .instance-menu button[aria-checked='true'] {background: var(--theme-accent-soft); color: var(--theme-accent)}
 
-.topbar {border-color: var(--theme-glass-edge); box-shadow: var(--theme-glass-shadow)}
+.topbar {border-color: var(--theme-glass-edge); border-bottom: none !important; box-shadow: var(--theme-glass-shadow)}
 .connection-label, .eyebrow, .text-button, .data-table summary {color: var(--theme-accent)}
 .connection-banner {background: var(--theme-warning-soft); color: var(--theme-warning)}
 

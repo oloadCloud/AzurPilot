@@ -603,13 +603,13 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
 
     def full_scan(self, queue=None, must_scan=None, mode='normal'):
         if self.config.Campaign_BossAutoSearch and self.is_boss_stage:
-            logger.info('已启用自律寻敌清除Boss且已处于Boss战，预设Boss生成以跳过地图扫描')
+            logger.info('[地图-摄像机] 已启用自律寻敌清除Boss且已处于Boss战，预设Boss生成以跳过地图扫描')
             boss_grids = self.map.select(may_boss=True)
             if boss_grids:
                 for grid in boss_grids:
                     grid.is_boss = True
                     grid.is_enemy = True
-                logger.info(f'预设Boss位于: {boss_grids}')
+                logger.info(f'[地图-Boss] 预设Boss位于: {boss_grids}')
             return
         
         if self.config.MAP_HAS_DECOY_ENEMY and mode == 'normal':
@@ -1148,7 +1148,7 @@ class Fleet(SubmarineAdvanced, Camera, AmbushHandler):
             preset (tuple): 预设的滑动偏移量 (x, y)。
         """
         if self.config.Campaign_BossAutoSearch:
-            logger.info('已启用自律寻敌清除Boss，跳过摄像机重新聚焦')
+            logger.info('[地图-摄像机] 已启用自律寻敌清除Boss，跳过摄像机重新聚焦')
             return
 
         camera = self.camera

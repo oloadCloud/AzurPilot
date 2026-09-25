@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { useParams } from 'react-router-dom'
-import { Play, Search, Settings2, Ship, Terminal } from 'lucide-react'
+import { CalendarClock, Clock3, ListTree, Play, Search, Settings2, Ship, Terminal } from 'lucide-react'
 import { api } from '../api/client'
 import type { Config } from '../api/types'
 import { useApp, useConnection } from '../app/context'
 import { usesLegacyLayout } from '../app/theme'
+import { readRailView, setRailView, subscribeRailView } from '../app/railPrefs'
+import { smoothScrollToElement } from '../app/scroll'
 import { Empty, ErrorBox, Loading, Modal, PageTitle } from '../components/ui'
 import { LogPanel } from '../components/LogPanel'
 import { MeowfficerScorePanel } from '../components/MeowfficerScorePanel'
@@ -12,6 +14,9 @@ import { FieldInput } from '../components/FieldInput'
 import { RestrictedLuaEditor } from '../components/RestrictedLuaEditor'
 import { ShopStrategyHelp } from '../components/ShopStrategyHelp'
 import { StorageField } from '../components/StorageField'
+import { SchedulerWidget } from '../components/SchedulerWidget'
+import { TaskQueue } from '../components/TaskQueue'
+import { useInstanceOverview } from '../components/useInstanceOverview'
 import { editor, prepareValue } from '../config/editors'
 import { EditStatus } from '../components/EditStatus'
 import { isFieldVisible } from './configVisibility'
@@ -20,6 +25,9 @@ export function TaskConfig() {
   const {instance = '', task = ''} = useParams()
   const {schema, t, ui, notify, language, theme} = useApp()
   const connection = useConnection()
+  const railView = useSyncExternalStore(subscribeRailView, readRailView)
+  // 只在真的切到调度器时才请求总览数据，否则这一页白拉一份队列。
+  const [railData, setRailData] = useInstanceOverview(instance, railView === 'scheduler')
   const [config, setConfig] = useState<Config>()
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
@@ -29,6 +37,10 @@ export function TaskConfig() {
 
   const queue = editor(`config:${instance}`)
   const {edits, storageError} = useSyncExternalStore(queue.subscribe, queue.getSnapshot)
+  const startupQueue = editor(`startup:${instance}`)
+  const startupEdits = useSyncExternalStore(startupQueue.subscribe, startupQueue.getSnapshot)
+  const [startupEnabled, setStartupEnabled] = useState<boolean>()
+  const [startupRemember, setStartupRemember] = useState<boolean>()
   const legacy = usesLegacyLayout(theme)
   const reload = useCallback(async () => {
     try {
@@ -41,6 +53,22 @@ export function TaskConfig() {
     }
   }, [instance, queue])
 
+  // 字段保存成功后用服务端回传的整份配置替换本地副本。
+  useEffect(() => {
+    queue.onSaved = data => setConfig(data as Config)
+    return () => { queue.onSaved = undefined }
+  }, [queue])
+
+  // 启动开关保存成功后用服务端回传的状态替换本地值，队列丢弃已保存条目后开关不回弹。
+  useEffect(() => {
+    startupQueue.onSaved = data => {
+      const value = data as {enabled: boolean; remember: boolean}
+      setStartupEnabled(value.enabled)
+      setStartupRemember(value.remember)
+    }
+    return () => { startupQueue.onSaved = undefined }
+  }, [startupQueue])
+
   useEffect(() => {
     if (connection !== 'ready') return
     let active = true
@@ -50,6 +78,16 @@ export function TaskConfig() {
     }).catch(error => { if (active) setError(error.message) })
     return () => { active = false }
   }, [connection, instance, task, queue])
+  /* 开关状态取自部署层的运行列表，不在任务配置里。 */
+  useEffect(() => {
+    if (connection !== 'ready' || task !== 'Alas') return
+    let active = true
+    const confirmed = startupQueue.confirmed()
+    void api.request('startup.get', {instance}).then(value => {
+      if (active) { setStartupEnabled(value.enabled); setStartupRemember(value.remember); startupQueue.reconcile(confirmed) }
+    }).catch(error => { if (active) setError(error.message) })
+    return () => { active = false }
+  }, [connection, instance, task, startupQueue])
   useEffect(() => { setShopModeError('') }, [instance, task])
 
   async function run() {
@@ -124,6 +162,8 @@ export function TaskConfig() {
                 {readonly && <span className="small-label">{ui('task.readonly')}</span>}
               </label>
               {help && help !== 'help' && help !== arg && <p>{help.replace(/<[^>]*>/g, '')}</p>}
+              {/* 多行控件的提示跟标题同一行，浮在它右端。 */}
+              {isMultiline && <EditStatus id={path} edit={edit} retry={queue.retry} queue={queue} />}
             </div>
             <div className="field-control">
               {field.type === 'storage' ? (
@@ -178,9 +218,9 @@ export function TaskConfig() {
                     }}><Play size={15}/></button>
                 </div>
               )}
-              {shopMode && shopModeError && !edit ? (
+              {!isMultiline && (shopMode && shopModeError && !edit ? (
                 <div id={`${path}-status`} className="edit-status edit-error" role="alert">{shopModeError}</div>
-              ) : <EditStatus id={path} edit={edit} retry={queue.retry} />}
+              ) : <EditStatus id={path} edit={edit} retry={queue.retry} queue={queue} />)}
             </div>
           </div>
         )
@@ -192,7 +232,37 @@ export function TaskConfig() {
   const hasGroups = task !== 'FleetInfo' && Boolean(groups) && visibleGroups.length > 0
   // 只有紧凑主题把搜索框并进左列（跳转栏下方），其余主题保持标题下方的原样。
   const condensed = theme === 'extreme'
-  const groupCardsBlock = <div className="config-groups">{groupCards}</div>
+  // 启动开关挂在系统设置（Alas）任务页顶部；搜索时只显示匹配项。
+  const startupPanel = task === 'Alas' && !search && <section className="panel config-group">
+    <div className="panel-heading">
+      <div>
+        <span className="group-indicator"/>
+        <h2>{ui('instance.startup')}</h2>
+      </div>
+    </div>
+    <div className="field-row">
+      <div className="field-label">
+        <span className="field-name">{ui('instance.autoRun')}</span>
+        <p>{ui('instance.autoRunHelp')}</p>
+      </div>
+      <div className="field-control">
+        <FieldInput id="instance-startup" label={ui('instance.autoRun')} value={startupEdits.edits.enabled?.value ?? startupEnabled ?? false} disabled={startupEnabled === undefined} onChange={value => startupQueue.change('enabled', value)}/>
+        <EditStatus id="instance-startup" edit={startupEdits.edits.enabled} retry={startupQueue.retry} queue={startupQueue}/>
+      </div>
+    </div>
+    <div className="field-row">
+      <div className="field-label">
+        <span className="field-name">{ui('instance.rememberRun')}</span>
+        <p>{ui('instance.rememberRunHelp')}</p>
+      </div>
+      <div className="field-control">
+        <FieldInput id="instance-remember" label={ui('instance.rememberRun')} value={startupEdits.edits.remember?.value ?? startupRemember ?? false} disabled={startupRemember === undefined} onChange={value => startupQueue.change('remember', value)}/>
+        <EditStatus id="instance-remember" edit={startupEdits.edits.remember} retry={startupQueue.retry} queue={startupQueue}/>
+      </div>
+    </div>
+  </section>
+
+  const groupCardsBlock = <div className="config-groups">{startupPanel}{groupCards}</div>
   const groupNav = <nav className="group-nav">
     {visibleGroups.map(({group}) => (
       <a
@@ -200,7 +270,8 @@ export function TaskConfig() {
         href={`#group-${group}`}
         onClick={event => {
           event.preventDefault()
-          document.getElementById(`group-${group}`)?.scrollIntoView({behavior: 'smooth', block: 'start'})
+          const target = document.getElementById(`group-${group}`)
+          if (target) smoothScrollToElement(target)
         }}
       >
         {t(`${group}._info.name`)}
@@ -209,6 +280,36 @@ export function TaskConfig() {
   </nav>
 
   // 有分组导航时，搜索框随导航一起放进左列（导航下方）；没有导航时才留在标题下方。
+  // 右列默认是任务设置的锚点目录，点右上角切到调度器；两种视图共用同一个外壳。
+  const railToggle = <button
+    type="button"
+    className="task-rail-toggle icon-button"
+    aria-pressed={railView === 'scheduler'}
+    aria-label={railView === 'scheduler' ? ui('nav.railDirectory') : ui('nav.railScheduler')}
+    title={railView === 'scheduler' ? ui('nav.railDirectory') : ui('nav.railScheduler')}
+    onClick={() => setRailView(railView === 'scheduler' ? 'directory' : 'scheduler')}
+  >{railView === 'scheduler' ? <CalendarClock size={17}/> : <ListTree size={17}/>}</button>
+
+  const rail = <aside className={`task-config-rail is-${railView}`} aria-label={railView === 'scheduler' ? ui('scheduler.rail') : ui('task.groupNav')}>
+    {railView === 'scheduler'
+      ? <div className="task-rail-scheduler">
+          <SchedulerWidget instance={instance} data={railData} onData={setRailData} action={railToggle}/>
+          <section className="rail-schedule" aria-label={ui('scheduler.plan')}>
+            <div className="rail-section-heading">
+              <div><Clock3 size={15}/><span>{ui('scheduler.plan')}</span></div>
+              <span>{railData?.tasks.length ?? 0}</span>
+            </div>
+            <TaskQueue instance={instance} data={railData}/>
+          </section>
+        </div>
+      : <div className="task-rail-directory">
+          <div className="rail-section-heading">
+            <div>{railToggle}<span>{ui('task.groupNav')}</span></div>
+          </div>
+          {groupNav}
+        </div>}
+  </aside>
+
   const configToolbar = showConfigToolbar && <div className="config-toolbar">
       <div className="input-icon">
         <Search size={17} />
@@ -225,7 +326,7 @@ export function TaskConfig() {
   const groupsSection = task === 'FleetInfo' ? (
     <FleetInfo value={config.values.FleetInfo?.FleetInfo?.Result} />
   ) : !hasGroups ? (
-    (search || !tool) && <Empty icon={<Settings2 size={30} />} title={ui('task.noConfig')}>
+    (search || !tool) && <Empty icon={<Settings2 size={30} />} title={ui(search ? 'task.noConfigFound' : 'task.noConfig')}>
       {search ? ui('task.tryOtherKeyword') : ui('task.viewRelated')}
     </Empty>
   ) : groupCardsBlock
@@ -240,13 +341,16 @@ export function TaskConfig() {
     <LogPanel />
   </section>
 
-  // 旧版的任务详细设置：参数卡在左、分组导航在右，页名由顶栏居中显示。
-  // 这里不放调度器与任务计划 —— 旧版把它们留在总览页。
+  // 旧版的任务详细设置：参数卡在左、右列在「分组目录 / 调度器」之间切，页名由顶栏居中显示。
   if (legacy) return <>
-    <div className={`task-config-legacy${hasGroups ? '' : ' no-nav'}`}>
+    <div className="task-config-legacy">
       <h1 className="legacy-sr-title">{t(`Task.${task}.name`)}</h1>
-      <div className="task-config-settings">{head}{groupsSection}{scorePanel}{toolPanel}</div>
-      {hasGroups && groupNav}
+      <div className="task-config-settings">
+        {/* 换任务时重挂一次，让内容列的淡入重放。 */}
+        <div className="task-config-settings-inner" key={task}>{head}{groupsSection}{scorePanel}{toolPanel}</div>
+      </div>
+      {/* 目录是逐页内容，跟着任务换；调度器是常驻的，换任务不重挂。 */}
+      <div className="task-config-rail-slot" key={railView === 'directory' ? task : 'scheduler'}>{rail}</div>
     </div>
     {modal}
   </>

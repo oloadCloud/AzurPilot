@@ -292,7 +292,7 @@ class Map(Fleet):
         grids = self.select_grids(grids, **kwargs)
 
         if grids:
-            logger.hr('避开潜在路障')
+            logger.hr('清除潜在路障')
             self.show_select_grids(grids, **kwargs)
             self.clear_chosen_enemy(grids[0])
             return True

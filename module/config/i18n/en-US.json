@@ -736,9 +736,24 @@
       "name": "Prohibit restarting when errors occur in sensitive tasks",
       "help": "When an error occurs, directly terminate AzurPilot without restarting the game. Use for debugging, commission tasks, research tasks, Obscured Zones, Abyssal Zones, and other critical timing tasks"
     },
-    "SaveErrorCount": {
-      "name": "Keep up to X error logs",
-      "help": "Error logs exceeding the upper limit will be deleted. If it is 0 or a negative value, there is no limit."
+    "SaveErrorRetentionDays": {
+      "name": "Error log expiration (days)",
+      "help": "Error scenes older than this are handled by the method below\n0 = keep everything"
+    },
+    "SaveErrorBackUpMethod": {
+      "name": "Expired error log processing method",
+      "help": "The backup directory is ./log/error/<instance>/bak",
+      "delete": "Delete",
+      "zip": "Compress backup",
+      "copy": "Copy backup"
+    },
+    "SaveErrorZipMethod": {
+      "name": "Compression format",
+      "help": "",
+      "bz2": "bz2",
+      "gzip": "gzip",
+      "xz": "xz",
+      "zip": "zip"
     },
     "OnePushConfig": {
       "name": "Error push settings",
@@ -936,7 +951,22 @@
     },
     "RetentionDays": {
       "name": "Screenshot retention (days)",
-      "help": "Drop record screenshots older than this many days are deleted automatically\n0 = no day-based cleanup (commission reward screenshots still keep the latest 50 only)"
+      "help": "Drop record screenshots older than this many days are handled by the method below\n0 = no day-based cleanup (commission reward screenshots still keep the latest 50 only)"
+    },
+    "BackUpMethod": {
+      "name": "Expired screenshot processing method",
+      "help": "The backup directory is the bak folder under the save directory (for commission rewards, under each instance folder)",
+      "delete": "Delete",
+      "zip": "Compress backup",
+      "copy": "Copy backup"
+    },
+    "ZipMethod": {
+      "name": "Compression format",
+      "help": "",
+      "bz2": "bz2",
+      "gzip": "gzip",
+      "xz": "xz",
+      "zip": "zip"
     },
     "AzurStatsID": {
       "name": "AzurStat ID",
@@ -1111,7 +1141,7 @@
     },
     "TaskPriorityAdjustment": {
       "name": "Task priority adjustment",
-      "help": "Drag task rows to adjust scheduler priority. Tasks closer to the top run first. New tasks are automatically inserted into suitable positions according to the built-in default priority."
+      "help": "Enter task names in order from top to bottom; tasks closer to the top run first. One task per line, or separate them with >. New tasks are automatically inserted into suitable positions according to the built-in default priority."
     }
   },
   "OneClickRetire": {
@@ -1626,7 +1656,7 @@
     },
     "Mode": {
       "name": "Select submarine sortie plan",
-      "help": "Only takes effect when auto-search is off. Note: 'Hunt and Boss' combines 'Hunt Only' and 'Boss Only' - submarines will hunt during mob battles and be summoned during boss battles.",
+      "help": "Only takes effect when auto-search is off. Note: 'Hunt and Boss' combines 'Hunt Only' and 'Boss Only' - submarines will hunt during mob battles and be summoned during boss battles.\nNote: Calling the submarine at the BOSS node requires the default battle UI theme, otherwise it will not be called.",
       "do_not_use": "Not used",
       "hunt_only": "Hunt only",
       "boss_only": "Boss only",
@@ -1850,6 +1880,10 @@
       "name": "Urgent Commission Farming",
       "help": "Warning: This feature allows players to earn a small amount of Gems, but it is not an efficient way to farm Gems\nNew Azur Lane players often overvalue limit break avoidance and low oil cost, while neglecting ship development\nRunning this feature only makes you feel productive, while your account actually makes zero progress\nPlease press the return button"
     },
+    "EventFallbackStage": {
+      "name": "Stage after event",
+      "help": "When the event PT limit or time limit is reached, or the event is unavailable, continue on this main campaign stage. Default: 2-4. Enter 0 to disable the task and keep the event stage. Only applies to tasks currently farming an event stage."
+    },
     "ChangeFlagship": {
       "name": "Change flagship",
       "help": "White-rarity light carriers and white-rarity carriers will be treated as retirement targets\nOnly 0 limit break, no equipment, white-rarity light carriers will be used as replacement\nControls: When to replace the flagship",
@@ -1945,11 +1979,11 @@
     },
     "PtLimit": {
       "name": "Stop when event PT reaches X",
-      "help": "When accumulated PT reaches the given value, all event tasks are disabled. 0 means no limit. Cannot trigger immediately when using auto-search.\nAfter enabling, you only need to open all event tasks without counting total runs."
+      "help": "When accumulated PT reaches the given value, all event tasks are disabled. 0 means no limit. Cannot trigger immediately when using auto-search.\nAfter enabling, you only need to open all event tasks without counting total runs.\nGems farming and Three-oil low-cost farming follow their own Stage after event setting: continue on a main campaign stage, or stop if set to 0."
     },
     "TimeLimit": {
       "name": "Event time limit",
-      "help": "When local time exceeds the given value, all event tasks are disabled. '2020-01-01 00:00:00' means no limit. Timer resets after triggering once.\nAfter setting, prevents forgetting to close tasks after an event ends."
+      "help": "When local time exceeds the given value, all event tasks are disabled. '2023-01-01 00:00:00' means no limit. Timer resets after triggering once.\nAfter setting, prevents forgetting to close tasks after an event ends.\nGems farming and Three-oil low-cost farming follow their own Stage after event setting: continue on a main campaign stage, or stop if set to 0."
     }
   },
   "TaskBalancer": {

@@ -163,6 +163,7 @@ function validateField(path, value) {
 export function createMockState({empty = false} = {}) {
   const instances = new Map()
   const startup = new Set()
+  const remember = new Set()
   const commits = Array.from({length: 123}, (_, index) => ({sha: createHash('sha1').update(`mock-commit-${123 - index}`).digest('hex'), author: 'AzurPilot', date: new Date(Date.UTC(2026, 8, 14, 0, -index)).toISOString(), message: index === 0 ? 'feat(webui): 新增主页与实例状态\n\n统一全局设置和更新入口。' : `fix(runtime): 改善任务运行稳定性 ${123 - index}`}))
   let localHead = commits[3].sha
   let upstreamHead = commits[0].sha
@@ -206,7 +207,7 @@ export function createMockState({empty = false} = {}) {
         Gem: {Value: 2468 - index * 10},
         Cube: {Value: 384 - index * 5},
         Pt: {Value: 42500 - index * 200},
-        ActionPoint: {Value: 101 - index * 2, Total: 1301 - index * 2},
+        ActionPoint: {Value: 101 - index * 2, Total: 5301 - index * 2},
         YellowCoin: {Value: 1520 - index * 20},
         PurpleCoin: {Value: 340 - index * 10},
         Core: {Value: 1280 - index * 15},
@@ -345,7 +346,7 @@ export function createMockState({empty = false} = {}) {
           if (name === 'demo-alt') return []
           const baseMap = {
             oil: 14200, coin: 186420, gem: 2468, cube: 384, pt: 42500, core: 1280, medal: 650, merit: 18400, guild_coin: 7600,
-            ap: 101, asset: 1301, distance: 4520, yellow_coins: 1520, purple_coins: 340,
+            ap: 101, asset: 5301, distance: 4520, yellow_coins: 1520, purple_coins: 340,
             Chip: 240, total_exp_gained: 152000, battle_count: 36, total_run_time: 2490,
           }
           const resKeyMap = {
@@ -463,10 +464,11 @@ export function createMockState({empty = false} = {}) {
         for (const field of fields) if (field.key in params.values && field.key !== 'Password') field.value = params.values[field.key]
         return {updated: Object.keys(params.values)}
       }
-      case 'startup.get': return {enabled: startup.has(name)}
+      case 'startup.get': return {enabled: startup.has(name), remember: remember.has(name)}
       case 'startup.set':
-        if (params.enabled) startup.add(name); else startup.delete(name)
-        return {enabled: params.enabled}
+        if (params.enabled !== undefined) { if (params.enabled) startup.add(name); else startup.delete(name) }
+        if (params.remember !== undefined) { if (params.remember) remember.add(name); else remember.delete(name) }
+        return {enabled: startup.has(name), remember: remember.has(name)}
       case 'events.subscribe':
         if (params.topics.some(topic => topic !== 'instances') && !name) fail('INVALID_PARAMS', '订阅此主题需要指定实例')
         return {topics: params.topics, instance: name ?? null}
