@@ -74,7 +74,7 @@ class GitManager(DeployConfig):
         for i in range(max_retry):
             git = f'"{self.git}" -c http.userAgent={ua}'
             logger.info(f'Use git User-Agent: {ua}')
-            if self.execute(f'{git} fetch {source} {branch}:refs/remotes/{source}/{branch}'):
+            if self.execute(f'{git} fetch {source} +{branch}:refs/remotes/{source}/{branch}'):
                 return
             logger.warning(f'git fetch failed with UA {ua}, attempt {i + 1}/{max_retry}')
             if i < max_retry - 1:

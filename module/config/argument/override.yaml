@@ -576,6 +576,8 @@ OperationHandover:
       display: hide
     UseAutoSearch:
       display: hide
+    BossAutoSearch:
+      display: hide
     Use2xBook:
       display: hide
     AmbushEvade:
