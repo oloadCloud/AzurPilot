@@ -63,6 +63,7 @@ export const familyRegions: Record<Family, readonly RegionId[]> = {
   legacy: REGIONS,
   minimal: [],
   extreme: [],
+  fluent: [],
 }
 
 export const knobFor = (id: string) => regionKnobs.find(knob => knob.id === id)

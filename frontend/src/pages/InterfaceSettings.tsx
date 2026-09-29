@@ -14,7 +14,7 @@ import { BackgroundPreferences } from '../components/BackgroundPreferences'
 
 /** 一级主题大类各自的明暗成员；新版与旧版各有两个，简洁与紧凑各一个。 */
 const familyThemes: Record<ReturnType<typeof familyOf>, Theme[]> = {
-  new: ['light', 'dark'], legacy: ['legacy-light', 'legacy-dark'], minimal: ['minimal'], extreme: ['extreme'],
+  new: ['light', 'dark'], legacy: ['legacy-light', 'legacy-dark'], minimal: ['minimal'], extreme: ['extreme'], fluent: ['fluent'],
 }
 
 /** 界面设置：主题、材质、明暗、配色、背景与语言，只影响当前浏览器，不写进实例配置。 */
@@ -42,6 +42,7 @@ export function InterfaceSettings() {
               <option value="legacy">{ui('settings.familyLegacy')}</option>
               <option value="minimal">{ui('settings.themeMinimal')}</option>
               <option value="extreme">{ui('settings.themeExtreme')}</option>
+			  <option value="fluent">{ui('settings.themeFluent')}</option>
             </Select>
           </div>
         </div>

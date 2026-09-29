@@ -237,7 +237,7 @@ export function TaskConfig() {
 
   const hasGroups = task !== 'FleetInfo' && Boolean(groups) && visibleGroups.length > 0
   // 只有紧凑主题把搜索框并进左列（跳转栏下方），其余主题保持标题下方的原样。
-  const condensed = theme === 'extreme'
+  const condensed = theme === 'extreme' || theme === 'fluent'
   // 启动开关挂在系统设置（Alas）任务页顶部；搜索时只显示匹配项。
   const startupPanel = task === 'Alas' && !search && <section className="panel config-group">
     <div className="panel-heading">
@@ -363,7 +363,7 @@ export function TaskConfig() {
 
   return <>
     {/* 紧凑主题下任务名与面包屑末段重复，省掉标题行让内容上移，只留无障碍标题 */}
-    {theme === 'extreme'
+    {theme === 'extreme' || theme === 'fluent'
       ? <h1 className="sr-title">{t(`Task.${task}.name`)}</h1>
       : <PageTitle title={t(`Task.${task}.name`)}/>}
     {head}

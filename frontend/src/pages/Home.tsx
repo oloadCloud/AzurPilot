@@ -45,7 +45,8 @@ export function Home() {
     try { previous = localStorage.getItem('azurpilot.theme-before-legacy') } catch { /* 同上。 */ }
     setTheme(previous !== null && MODERN_THEMES.includes(previous) ? previous as Theme : resolvedMode === 'dark' ? 'dark' : 'light')
   }
-  const hasAnnouncement = Boolean(announcement.data && (announcement.data.title || announcement.data.content))
+  const isTargetTheme = theme === 'fluent'
+  const hasAnnouncement = !isTargetTheme && Boolean(announcement.data && (announcement.data.title || announcement.data.content))
   return <>
     <div className="home-editorial">
       <aside className={`home-deck ${hasAnnouncement ? 'home-deck-with-announcement' : ''}`}>

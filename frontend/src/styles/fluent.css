@@ -1,0 +1,450 @@
+/* ── 共享层 ── */
+
+@import './tokens.css';
+@import './layout.css';
+@import './components.css';
+@import './insights.css';
+@import './home.css';
+@import './apple.css';
+@import './dev-effects.css';
+@import './dev.css';
+@import './theme-system.css';
+@import './forms.css';
+@import './motion.css';
+
+/* ── 亚克力参数与配色 ── */
+
+:root[data-theme='fluent'] {
+  /* 亚克力底色 */
+  --glass-tint: #1e1e1eb8;
+  --glass-muted: #16161680;
+  --glass-edge: #ffffff14;
+  --glass-shadow: 0 2px 8px #00000040;
+  --theme-plate-bg: #16161640;
+  --theme-glass-blur: 30px;
+  --theme-glass-saturation: 120%;
+  --theme-material-filter: blur(30px) saturate(120%);
+  --theme-plate-filter: none;
+  --theme-overlay-filter: none;
+
+  /* 基础色板 */
+  color-scheme: dark;
+  --bg: #1a1a1a;
+  --surface: #2b2b2b9a;
+  --surface-muted: #2020209a;
+  --text: #f0f0f0;
+  --muted: #a8a8a8;
+  --border: #ffffff0d;
+  --accent: #0099d4;
+  --accent-hover: #1184d8;
+  --accent-soft: #0078d422;
+  --secondary: #60cdff;
+  --secondary-soft: #60cdff1a;
+  --sidebar: var(--surface);
+  --radius: 0px;
+  --shadow: var(--glass-shadow);
+  --red: #f1707b;
+  --green: #6ed585;
+  --green-soft: #6ed5851a;
+  --sidebar-width: 178px;
+  --right-rail-width: 244px;
+  --topbar-height: 44px;
+
+  /* 字体 */
+  --theme-font-sans: "Segoe UI", "Microsoft YaHei", "MiSans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --theme-font-mono: "Fira Code", "Segoe UI Emoji", "等距更纱黑体 SC", monospace;
+  font-family: var(--theme-font-sans);
+
+  /* 契约层 —— 形状：全直角 */
+  --theme-radius-control: 0px;
+  --theme-radius-button: 0px;
+  --theme-radius-panel: 0px;
+  --theme-radius-card: 0px;
+  --theme-radius-popover: 0px;
+  --theme-radius-pill: 0px;
+
+  /* 契约层 —— Chrome / 玻璃 */
+  --theme-sidebar: var(--glass-tint);
+  --theme-glass: var(--glass-tint);
+  --theme-glass-edge: var(--glass-edge);
+  --theme-glass-shadow: var(--glass-shadow);
+  --theme-shadow-panel: var(--glass-shadow);
+  --theme-shadow-floating: 0 4px 12px #00000050;
+  --theme-shadow-hover: 0 4px 16px #00000060;
+  --theme-shadow-popover: 0 8px 24px #00000060;
+  --theme-shadow-modal: 0 16px 48px #00000080;
+
+  /* 契约层 —— 导航 */
+  --theme-nav-text: var(--text);
+  --theme-nav-icon: var(--accent);
+  --theme-nav-active-bg: var(--accent-soft);
+  --theme-nav-active-text: var(--accent);
+  --theme-nav-expanded-bg: var(--accent-soft);
+  --theme-nav-hover-bg: #ffffff08;
+  --theme-nav-popover-bg: var(--glass-tint);
+  --theme-nav-popover-edge: var(--glass-edge);
+  --theme-nav-popover-shadow: var(--glass-shadow);
+  --theme-primary-bg: var(--accent);
+  --theme-primary-hover: var(--accent-hover);
+
+  /* 契约层 —— 表单 */
+  --theme-input-bg: var(--glass-muted);
+  --theme-input-text: var(--text);
+  --theme-input-border: #ffffff14;
+  --theme-focus: var(--accent);
+  --theme-focus-ring: #0078d440;
+
+  /* 契约层 —— 分段 / 反馈 / 选择 */
+  --theme-segment-bg: #ffffff0a;
+  --theme-segment-border: #ffffff0d;
+  --theme-segment-indicator: #ffffff1a;
+  --theme-on-accent: #fff;
+  --theme-on-danger: #fff;
+  --theme-danger: var(--red);
+  --theme-danger-soft: #f1707b1a;
+  --theme-success: var(--green);
+  --theme-success-soft: var(--green-soft);
+  --theme-warning: #ffb900;
+  --theme-warning-soft: #ffb9001a;
+  --theme-toast-bg: var(--surface);
+  --theme-toast-text: var(--text);
+  --theme-toast-error-bg: var(--red);
+  --theme-selection: var(--accent-soft);
+  --theme-scrollbar-thumb: #ffffff33;
+  --theme-status-stopped-bg: var(--surface-muted);
+  --theme-status-stopped-text: var(--muted);
+
+  /* 契约层 —— 标题 */
+  --theme-title-fill: none;
+  --theme-title-color: var(--text);
+  --theme-title-stroke: var(--text);
+  --theme-title-highlight-stroke: var(--text);
+  --theme-title-glass: var(--surface);
+  --theme-title-shadow: none;
+
+  /* 其他组件 */
+  --theme-instance-icon-bg: var(--accent);
+  --theme-instance-icon-shadow: none;
+  --theme-login-art-bg: linear-gradient(135deg, #0078d4, #005a9e 55%, #004578);
+  --theme-login-art-text: #fff;
+  --theme-preview-bg: radial-gradient(ellipse at 50% 45%, #2a3a4a, #1a2030 65%);
+  --theme-preview-text: #adc3cc;
+  --theme-preview-muted: #718c99;
+}
+
+:root[data-theme='fluent'] code,
+:root[data-theme='fluent'] kbd,
+:root[data-theme='fluent'] samp {font-family: var(--theme-font-mono)}
+
+
+/* ── 亚克力材质层级 ── */
+
+:root[data-theme='fluent'] .panel,
+:root[data-theme='fluent'] .period-controls,
+:root[data-theme='fluent'] .resource-card,
+:root[data-theme='fluent'] .sidebar,
+:root[data-theme='fluent'] .right-rail,
+:root[data-theme='fluent'] .glass-material,
+:root[data-theme='fluent'] .home-main,
+:root[data-theme='fluent'] .task-submenu-flyout,
+:root[data-theme='fluent'] .instance-menu {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--theme-material-filter);
+  backdrop-filter: var(--theme-material-filter);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+:root[data-theme='fluent'] .panel,
+:root[data-theme='fluent'] .period-controls,
+:root[data-theme='fluent'] .resource-card,
+:root[data-theme='fluent'] .glass-material,
+:root[data-theme='fluent'] .home-main,
+:root[data-theme='fluent'] .task-submenu-flyout,
+:root[data-theme='fluent'] .instance-menu {
+  border: 1px solid var(--glass-edge);
+}
+
+/* 浮层与控件 */
+:root[data-theme='fluent'] .title-actions,
+:root[data-theme='fluent'] .select-menu {
+  background: var(--glass-muted);
+  -webkit-backdrop-filter: var(--theme-material-filter);
+  backdrop-filter: var(--theme-material-filter);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+:root[data-theme='fluent'] .topbar {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--theme-material-filter);
+  backdrop-filter: var(--theme-material-filter);
+  box-shadow: var(--glass-shadow);
+  margin-left: 0;
+}
+:root[data-theme='fluent'] [role="tab"][aria-selected="true"],
+:root[data-theme='fluent'] .stat-chip.active {
+  background: var(--glass-muted);
+  border: 1px solid var(--accent);
+  box-shadow: var(--glass-shadow);
+}
+:root[data-theme='fluent'] .toast {border: 1px solid var(--accent)}
+:root[data-theme='fluent'] .glass-material-lens {display: none}
+:root[data-theme='fluent'] .home-main::before {display: none}
+:root[data-theme='fluent'] .login-art::before {display: none}
+
+/* 分段控件 */
+:root[data-theme='fluent'] .monitor-segmented {
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-edge);
+}
+:root[data-theme='fluent'] .monitor-segmented .segmented-indicator {
+  background: var(--glass-tint);
+  border: 1px solid var(--accent);
+  box-shadow: 0 1px 3px #00000020;
+}
+:root[data-theme='fluent'] .home-instance-grid .instance-card {
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+:root[data-theme='fluent'] .home-instance-grid .instance-card:hover {
+  border-color: var(--accent-hover);
+  box-shadow: var(--theme-shadow-hover);
+}
+
+/* 右栏 */
+:root[data-theme='fluent'] .scheduler-widget {
+  background: var(--glass-muted);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 2px 8px #00000040
+  }
+:root[data-theme='fluent'] .rail-queue-group.running {box-shadow: 0 2px 8px #00000040}
+:root[data-theme='fluent'] .rail-queue-group.pending {box-shadow: 0 2px 4px #00000030}
+:root[data-theme='fluent'] .rail-queue-group.waiting {box-shadow: 0 2px 4px #00000020}
+
+/* ── 全直角覆盖(强制覆盖 apple.css 圆角) ── */
+
+:root[data-theme='fluent'] .home-main,
+:root[data-theme='fluent'] .sidebar,
+:root[data-theme='fluent'] .right-rail,
+:root[data-theme='fluent'] .topbar,
+:root[data-theme='fluent'] .panel,
+:root[data-theme='fluent'] .resource-card,
+:root[data-theme='fluent'] .instance-card,
+:root[data-theme='fluent'] .stat-metric-card,
+:root[data-theme='fluent'] .modal,
+:root[data-theme='fluent'] .toast,
+:root[data-theme='fluent'] .home-legacy-toggle,
+:root[data-theme='fluent'] .scheduler-widget,
+:root[data-theme='fluent'] .scheduler-stats > div,
+:root[data-theme='fluent'] .rail-queue-group,
+:root[data-theme='fluent'] .task-submenu-flyout,
+:root[data-theme='fluent'] .instance-menu,
+:root[data-theme='fluent'] .rail-task-item,
+:root[data-theme='fluent'] .task-submenu-item,
+:root[data-theme='fluent'] .primary-nav a,
+:root[data-theme='fluent'] .task-group-button,
+:root[data-theme='fluent'] .nav-search,
+:root[data-theme='fluent'] .group-nav,
+:root[data-theme='fluent'] .group-nav a,
+:root[data-theme='fluent'] .icon-button,
+:root[data-theme='fluent'] .lucide,
+:root[data-theme='fluent'] .status,
+:root[data-theme='fluent'] .task-state,
+:root[data-theme='fluent'] .count-badge,
+:root[data-theme='fluent'] .button,
+:root[data-theme='fluent'] .text-button,
+:root[data-theme='fluent'] .input-icon,
+:root[data-theme='fluent'] .preview-log,
+:root[data-theme='fluent'] .preview-screen,
+:root[data-theme='fluent'] .select-trigger,
+:root[data-theme='fluent'] .select-menu,
+:root[data-theme='fluent'] .select-option,
+:root[data-theme='fluent'] .yaml-editor,
+:root[data-theme='fluent'] .storage-field pre,
+:root[data-theme='fluent'] .remote-address code,
+:root[data-theme='fluent'] .monitor-segmented,
+:root[data-theme='fluent'] .monitor-segmented .segmented-indicator,
+:root[data-theme='fluent'] .monitor-segmented button,
+:root[data-theme='fluent'] .md-code-wrap,
+:root[data-theme='fluent'] .md-code-copy,
+:root[data-theme='fluent'] .resource-editor-card,
+:root[data-theme='fluent'] .resource-editor-icon,
+:root[data-theme='fluent'] .resource-editor-add,
+:root[data-theme='fluent'] .resource-editor-add-icon,
+:root[data-theme='fluent'] .resource-editor-remove,
+:root[data-theme='fluent'] .resource-picker,
+:root[data-theme='fluent'] .resource-picker-card,
+:root[data-theme='fluent'] .resource-picker-empty,
+:root[data-theme='fluent'] .resource-picker-option,
+:root[data-theme='fluent'] .resource-heading > div,
+:root[data-theme='fluent'] .resource-image-wrap,
+:root[data-theme='fluent'] .instance-caption,
+:root[data-theme='fluent'] .instance-toggle,
+:root[data-theme='fluent'] .title-actions,
+:root[data-theme='fluent'] .home-instance-icon,
+:root[data-theme='fluent'] .brand-logo,
+:root[data-theme='fluent'] .stat-chip,
+:root[data-theme='fluent'] .checkbox-control,
+:root[data-theme='fluent'] .checkbox-mark input[type='checkbox'],
+:root[data-theme='fluent'] .error-box,
+:root[data-theme='fluent'] .commit-ref,
+:root[data-theme='fluent'] .live-label,
+:root[data-theme='fluent'] .instance-tab,
+:root[data-theme='fluent'] .instance-tab-create,
+:root[data-theme='fluent'] .instance-menu button,
+:root[data-theme='fluent'] .instance-create,
+:root[data-theme='fluent'] .update-notice.sidebar-update-notice {border-radius: 0}
+
+/* glass 组件 */
+:root[data-theme='fluent'] .glass-material,
+:root[data-theme='fluent'] .glass-material > *,
+:root[data-theme='fluent'] .glass-material-lens,
+:root[data-theme='fluent'] .glass-material-lens > * {border-radius: 0 !important}
+
+
+/* ── 紧凑骨架与留白（桌面 ≥950px 生效；窄屏保留 44px 触摸目标）── */
+
+:root[data-theme='fluent'] .app-shell {gap: 0; min-height: var(--viewport-height); align-items: stretch}
+:root[data-theme='fluent'] .main-shell {min-height: calc(var(--viewport-height) - var(--topbar-height))}
+:root[data-theme='fluent'] main {max-height: calc(var(--viewport-height) - var(--topbar-height)); overflow-y: auto}
+
+:root[data-theme='fluent'] .config-side {
+  position: sticky; top: calc(var(--topbar-height) + 4px);
+  display: flex; flex-direction: column; gap: 10px; align-self: start;
+}
+:root[data-theme='fluent'] .config-side .group-nav {position: static; max-height: none}
+:root[data-theme='fluent'] .config-side .config-toolbar {margin-bottom: 0}
+:root[data-theme='fluent'] .config-side .config-toolbar .input-icon {max-width: none}
+
+@media (min-width: 950px) {
+  /* 侧栏 */
+  :root[data-theme='fluent'] .sidebar {padding: 0 8px 8px}
+  :root[data-theme='fluent'] .sidebar-brand {height: var(--topbar-height); margin-bottom: 6px; padding: 0 6px}
+  :root[data-theme='fluent'] .brand-title {font-size: 18px; gap: 7px}
+  :root[data-theme='fluent'] .sidebar-label {margin-bottom: 6px}
+  :root[data-theme='fluent'] .primary-nav {gap: 1px; margin-bottom: 10px}
+  :root[data-theme='fluent'] .primary-nav a {min-height: 30px; padding: 4px 8px}
+  :root[data-theme='fluent'] .nav-search {margin: 0 2px 6px; padding: 0 8px}
+  :root[data-theme='fluent'] .nav-search input {min-height: 26px; padding: 3px 0}
+  :root[data-theme='fluent'] .task-nav {gap: 0; padding: 0 2px 8px}
+  :root[data-theme='fluent'] .task-group-button {min-height: 30px; padding: 4px 7px}
+  :root[data-theme='fluent'] .task-submenu-item {min-height: 26px; padding: 3px 8px}
+  :root[data-theme='fluent'] .sidebar-footer {padding: 8px 6px}
+
+  /* 右栏 */
+  :root[data-theme='fluent'] .right-rail {top: var(--topbar-height); height: calc(var(--viewport-height) - var(--topbar-height))}
+  :root[data-theme='fluent'] .scheduler-widget {margin: 8px 8px 6px; padding: 8px}
+  :root[data-theme='fluent'] .scheduler-widget-heading {margin-bottom: 6px}
+  :root[data-theme='fluent'] .scheduler-stats {gap: 4px; margin-bottom: 6px}
+  :root[data-theme='fluent'] .scheduler-stats > div {padding: 5px 6px}
+  :root[data-theme='fluent'] .scheduler-stats strong {font-size: 13px}
+  :root[data-theme='fluent'] .rail-schedule {margin: 0 6px 6px; padding: 7px 2px 2px}
+  :root[data-theme='fluent'] .rail-section-heading {margin-bottom: 4px}
+  :root[data-theme='fluent'] .rail-task-list {gap: 4px}
+  :root[data-theme='fluent'] .rail-task-item {min-height: 32px; margin: 0; padding: 4px}
+  :root[data-theme='fluent'] .rail-queue-heading {padding: 6px 8px}
+  :root[data-theme='fluent'] .rail-queue-body {padding: 2px}
+  :root[data-theme='fluent'] .rail-queue-body a:hover {border: 1px solid var(--accent-hover)}
+
+  /* 内容区控件 */
+  :root[data-theme='fluent'] .button {padding: 5px 12px; height: 32px; min-height: 32px; font-size: 13px; font-weight: 500}
+  :root[data-theme='fluent'] .button.primary {background: var(--accent); color: #fff}
+  :root[data-theme='fluent'] .button.primary:hover:not(:disabled) {background: var(--accent-hover); transform: none}
+  :root[data-theme='fluent'] .icon-button {width: 28px; height: 28px}
+  :root[data-theme='fluent'] .text-button {min-height: 26px; padding: 2px}
+  :root[data-theme='fluent'] .select-trigger {padding: 5px 10px}
+  :root[data-theme='fluent'] .panel-heading {min-height: 0; padding: 10px 16px}
+  :root[data-theme='fluent'] .panel-heading h2 {font-size: 13px}
+  :root[data-theme='fluent'] .period-controls {margin-bottom: 20px; padding: 10px 16px}
+  :root[data-theme='fluent'] .page-title {margin-bottom: 8px; gap: 12px; min-height: 0; align-items: flex-start}
+  :root[data-theme='fluent'] .field-row {padding: 10px 16px; gap: 16px}
+  :root[data-theme='fluent'] .group-nav a {padding: 4px 6px}
+  :root[data-theme='fluent'] .group-nav a:hover {border: 1px solid var(--accent-hover)}
+  :root[data-theme='fluent'] .config-group {margin-top: 16px}
+
+  /* 顶栏 */
+  :root[data-theme='fluent'] .topbar {height: var(--topbar-height); min-height: 0}
+  :root[data-theme='fluent'] .app-shell.with-rail .topbar {width: calc(100% + var(--right-rail-width))}
+  :root[data-theme='fluent'] .app-shell:not(.with-rail) .topbar {width: 100%}
+}
+
+/* ── 高度对齐 ── */
+
+:root[data-theme='fluent'] .overview-page {
+  height: calc(var(--viewport-height) - var(--topbar-height) - 16px);
+  min-height: 0;
+  margin: 8px -24px -24px;
+  width: calc(100% + 48px);
+}
+:root[data-theme='fluent'] .overview-page::after {display: none}
+:root[data-theme='fluent'] .overview-main {flex: 1; margin-bottom: 0}
+:root[data-theme='fluent'] .overview-main > .panel,
+:root[data-theme='fluent'] .log-panel {flex: 1; min-height: 0}
+:root[data-theme='fluent'] .overview-page .log-content {height: auto; flex: 1; min-height: 150px; padding: 8px 12px; line-height: 1.5}
+
+/* ── 标题实色化（去 apple.css 的玻璃字效渐变）── */
+
+:root[data-theme='fluent'] .page-title h1 {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  -webkit-text-stroke: 0;
+  color: var(--text);
+  text-shadow: 0 2px 12px #000000a6, 0 1px 3px #00000073;
+}
+:root[data-theme='fluent'] .page-title h1::before,
+:root[data-theme='fluent'] .page-title h1::after {content: none}
+
+/* ── 极细滚动条 ── */
+
+:root[data-theme='fluent'] *::-webkit-scrollbar {width: 4px; height: 4px}
+:root[data-theme='fluent'] *::-webkit-scrollbar-thumb {background: #ffffff25}
+
+/* ── 按压与交互反馈 ── */
+
+:root[data-theme='fluent'] .button:active:not(:disabled),
+:root[data-theme='fluent'] .icon-button:active:not(:disabled) {filter: brightness(.9); transform: none}
+:root[data-theme='fluent'] .field-control > .field-actions .icon-only:hover:active:not(:disabled) {
+  background: var(--accent); color: var(--theme-on-accent);
+}
+
+/* 滑块开关 */
+:root[data-theme='fluent'] button.toggle {
+  width: 46px; height: 24px; padding: 0;
+  background: var(--surface-muted);
+  border: 1px solid var(--glass-edge);
+  border-radius: 2px;
+}
+:root[data-theme='fluent'] button.toggle::before {display: none}
+:root[data-theme='fluent'] button.toggle > span {
+  position: absolute; top: 2px; bottom: 2px; width: 20px; height: auto;
+  background: var(--text);
+  border-radius: 2px;
+  transform: translateX(2px);
+}
+:root[data-theme='fluent'] button.toggle.on,
+:root[data-theme='fluent'] button.toggle[aria-checked="true"] {background: var(--accent); border-color: var(--secondary)}
+:root[data-theme='fluent'] button.toggle.on > span,
+:root[data-theme='fluent'] button.toggle[aria-checked="true"] > span {transform: translateX(22px)}
+
+/* ── 窄屏（＜950px）：恢复触摸目标，骨架回到单列抽屉 ── */
+
+@media (max-width: 950px) {
+  :root[data-theme='fluent'] {--topbar-height: 56px}
+  :root[data-theme='fluent'] .topbar,
+  :root[data-theme='fluent'] .app-shell.with-rail .topbar {
+    width: 100%; margin-left: 0; height: 56px; padding: 0 14px;
+  }
+  :root[data-theme='fluent'] .sidebar,
+  :root[data-theme='fluent'] .right-rail {
+    top: 0; height: var(--viewport-height); z-index: 100;
+  }
+  :root[data-theme='fluent'] .sidebar-brand {padding: 0}
+  :root[data-theme='fluent'] .sidebar-brand .mobile-close {position: static; margin-left: auto}
+  :root[data-theme='fluent'] main {padding: 16px 14px}
+  :root[data-theme='fluent'] .button {min-height: 44px; height: auto; padding: 10px 16px}
+  :root[data-theme='fluent'] .icon-button {width: 44px; height: 44px}
+  :root[data-theme='fluent'] .monitor-segmented button {min-height: 44px}
+  :root[data-theme='fluent'] .overview-page {height: auto}
+}

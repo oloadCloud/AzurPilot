@@ -4,7 +4,7 @@
 
 import { palettes, paletteColors, paletteTokens, readCustomPalettes, colorModes, fixedColorModes, type Palette, type ColorMode, type ResolvedMode, type CustomPalette } from './palettes'
 import { applyFamilyCustom } from './themeCustom'
-export type Theme = 'light' | 'dark' | 'minimal' | 'extreme'
+export type Theme = 'light' | 'dark' | 'minimal' | 'extreme' | 'fluent'
   | 'legacy-light' | 'legacy-dark'
 export { palettes } from './palettes'
 export type { Palette, ColorMode, CustomPalette } from './palettes'
@@ -37,7 +37,7 @@ const MATERIAL_AXIS_THEMES: readonly Theme[] = ['light', 'dark', 'legacy-light',
 export const hasMaterialAxis = (theme: Theme) => MATERIAL_AXIS_THEMES.includes(theme)
 
 /** 是否支持自定义背景：两个有材质轴的家族都支持，普通材质同样可开。 */
-export const supportsBackground = (theme: Theme) => hasMaterialAxis(theme)
+export const supportsBackground = (theme: Theme) => hasMaterialAxis(theme) || theme === 'fluent'
 
 /** 是否铺背景：有关闭档的材质由记录决定铺不铺，简洁与紧凑任何时候都不铺。 */
 export const showsWallpaper = (theme: Theme, source: 'off' | 'default' | 'url' | 'upload') =>
@@ -53,11 +53,12 @@ export const defaultMaterial = (theme: Theme): Material => (theme === 'light' ||
 export const usesGlassLayer = (theme: Theme, material: Material) => hasMaterialAxis(theme) && material === 'glass'
 
 /** 一级主题大类。家族内切换材质或明暗不改变已存的其他自定义项。 */
-export type Family = 'new' | 'legacy' | 'minimal' | 'extreme'
+export type Family = 'new' | 'legacy' | 'minimal' | 'extreme' | 'fluent'
 export const familyOf = (theme: Theme): Family =>
   theme === 'light' || theme === 'dark' ? 'new'
     : theme === 'legacy-light' || theme === 'legacy-dark' ? 'legacy'
-      : theme === 'extreme' ? 'extreme' : 'minimal'
+      : theme === 'extreme' ? 'extreme'
+        : theme === 'fluent' ? 'fluent' : 'minimal'
 
 /** 走配色方案机制的主题（界面上显示「主题模式」与「配色方案」两块）。 */
 const PALETTE_THEMES: readonly Theme[] = ['minimal', 'extreme']
@@ -73,7 +74,7 @@ export const usesLegacyShell = (theme: Theme, instance?: string) => Boolean(inst
 /** 是否渲染右栏。旧版主题把调度器与任务计划放进实例页左列，右栏整体让位，否则同一块内容会出现两处。 */
 export const showsRightRail = (theme: Theme, instance?: string) => Boolean(instance) && !usesLegacyLayout(theme)
 
-const VALID_THEMES: readonly string[] = ['light', 'dark', 'minimal', 'extreme',
+const VALID_THEMES: readonly string[] = ['light', 'dark', 'minimal', 'extreme', 'fluent',
   'legacy-light', 'legacy-dark']
 
 export function readThemePreference(): Preference {
@@ -180,6 +181,7 @@ const skinLoaders = {
   minimal: () => import('../styles/minimal.css?inline'),
   legacy: () => import('../styles/legacy.css?inline'),
   classic: () => import('../styles/classic.css?inline'),
+  fluent: () => import('../styles/fluent.css?inline'),
 } as const
 type Skin = keyof typeof skinLoaders
 
@@ -187,6 +189,7 @@ type Skin = keyof typeof skinLoaders
 function skinFor(theme: Theme): Skin {
   if (theme === 'minimal' || theme === 'extreme') return 'minimal'
   if (theme === 'legacy-light' || theme === 'legacy-dark') return 'legacy'
+  if (theme === 'fluent') return 'fluent'
   return 'classic'
 }
 

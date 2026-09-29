@@ -189,6 +189,7 @@ export const stockBrands: Record<Family, Record<ResolvedMode, BrandColors>> = {
   legacy: {light: {primary: '#4e4c97', secondary: '#7a77bb'}, dark: {primary: '#b4b1e5', secondary: '#928fcf'}},
   minimal: {light: {primary: '#245dbe', secondary: '#147d83'}, dark: {primary: '#245dbe', secondary: '#147d83'}},
   extreme: {light: {primary: '#245dbe', secondary: '#147d83'}, dark: {primary: '#245dbe', secondary: '#147d83'}},
+  fluent: {light: {primary: '#0099d4', secondary: '#60cdff'}, dark: {primary: '#0099d4', secondary: '#60cdff'}},
 }
 
 export function paletteTokens(colors: BrandColors, mode: ResolvedMode): Record<string, string> {
