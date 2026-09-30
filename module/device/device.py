@@ -552,15 +552,10 @@ class Device(Screenshot, Control, AppControl, Input):
     def app_start(self):
         """启动游戏应用。
 
-        检查配置是否允许自动处理错误，执行账号恢复与画质设置同步后启动游戏并清空卡死记录。
+        与 HandleError 解耦：无论是否启用异常处理，都允许启动应用。
+        执行账号恢复与画质设置同步后启动游戏并清空卡死记录。
 
-        Raises:
-            RequestHumanTakeover: 当未启用错误处理配置时抛出。
         """
-        if not self.config.Error_HandleError:
-            logger.critical('[Device] 错误 没有启动/停止应用，因为 HandleError 已禁用')
-            logger.critical('[Device] 请启用 Alas.Error.HandleError 或手动登录碧蓝航线')
-            raise RequestHumanTakeover
         # 与推荐配置共用启动前流程：设备已连接，先恢复账号，再写配置，最后启动游戏。
         from module.api.account_service import restore_worker
         restore_worker(self.config.config_name, device=self)
@@ -583,8 +578,8 @@ class Device(Screenshot, Control, AppControl, Input):
             RequestHumanTakeover: 当未启用错误处理配置时抛出。
         """
         if not self.config.Error_HandleError:
-            logger.critical('[Device] 错误 没有启动/停止应用，因为 HandleError 已禁用')
-            logger.critical('[Device] 请启用 Alas.Error.HandleError 或手动登录碧蓝航线')
+            logger.critical('[Device] 错误 没有停止应用，因为 HandleError 已禁用')
+            logger.critical('[Device] 请打开 启用异常处理')
             raise RequestHumanTakeover
         super().app_stop()
         if getattr(self.config, 'Emulator_GameSettings', False):

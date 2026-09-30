@@ -831,6 +831,10 @@ class AzurLaneAutoScript:
     def config(self):
         try:
             config = AzurLaneConfig(config_name=self.config_name)
+            runtime = self.__dict__.get('_program_runtime')
+            if runtime is not None:
+                # 维护恢复发生在选任务之前，重载后的配置也必须接入系统通道。
+                runtime.attach(config)
             return config
         except RequestHumanTakeover:
             logger.error_context(
@@ -1057,6 +1061,10 @@ class AzurLaneAutoScript:
                 webui_title=f" <{self.config_name}> 发出了警告喵！",
                 webui_content=f"<{self.config_name}> 游戏未运行喵 将自动重启游戏喵~",
             )
+            if not self.config.Error_HandleError:
+                from module.handler.login import LoginHandler
+                LoginHandler(self.config, device=self.device).app_start()
+                return 'recoverable'
             self.config.task_call('Restart')
             return 'recoverable'
         except (GameStuckError, GameTooManyClickError) as e:
@@ -2018,8 +2026,17 @@ class AzurLaneAutoScript:
 
             time.sleep(5)
 
+            runtime = self.__dict__.get('_program_runtime')
+            if runtime and runtime.program_changed():
+                return False
             if self.config.should_reload():
                 return False
+
+    def scheduler_refresh(self):
+        """在任务边界只读取卡片要求的资源，异常复用已有恢复入口。"""
+        from module.scheduler.resources import refresh_resources
+        runtime = self.__dict__['_program_runtime']
+        runtime.refresh_result = refresh_resources(self.config, self.device, runtime.refresh_names)
 
     def get_next_task(self):
         """
@@ -2031,7 +2048,17 @@ class AzurLaneAutoScript:
         Returns:
             str: 下一个任务的方法名（如 'Restart'、'Commission'）。
         """
+        from module.scheduler.runtime import SchedulerRuntime
+        from module.config.config import name_to_function
+        runtime = self.__dict__.get('_program_runtime')
+        if runtime is None:
+            runtime = self.__dict__['_program_runtime'] = SchedulerRuntime(self)
         while 1:
+            selected = runtime.next_task()
+            if selected is not None:
+                self.config.task = name_to_function(selected)
+                self.config.bind(self.config.task)
+                return selected
             task = self.config.get_next()
             self.config.task = task
             self.config.bind(task)
@@ -2296,7 +2323,8 @@ class AzurLaneAutoScript:
                 _ = self.device
                 self.device.config = self.config
                 # 跳过第一次重启
-                if self.is_first_task and task == 'Restart':
+                runtime = self.__dict__.get('_program_runtime')
+                if self.is_first_task and task == 'Restart' and (runtime is None or runtime.mode == 'native'):
                     logger.info('[Alas] 调度器启动时跳过任务 `Restart`')
                     self.delay_next_restart()
                     del_cached_property(self, 'config')
@@ -2326,6 +2354,9 @@ class AzurLaneAutoScript:
                     self._record_daily_summary_task_finish(
                         daily_summary_run_id, success, task_started_at
                     )
+                    runtime = self.__dict__.get('_program_runtime')
+                    if runtime is not None:
+                        runtime.task_finished(task, success)
                 logger.info(f'[Alas] 调度器: 结束任务 `{task}`')
                 self.is_first_task = False
 
