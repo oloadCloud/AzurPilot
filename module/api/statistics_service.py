@@ -1,62 +1,29 @@
 """复用既有统计源，为分类页面提供指标、时间线和可导出的明细。"""
 import math
-import os
 import threading
 from datetime import datetime, timedelta
 
 from module.api.protocol import ApiError
+from module.persistence.database import configured_database, get_database
 
 _loot_lock = threading.Lock()
 
 
-def get_statistics_fingerprint(instance: str) -> str:
-    """获取当前实例统计数据的轻量级指纹。
-
-    检测 SQLite 本地快照库、CL1 记录库、舰船统计文件以及配置文件修改时间，
-    用于 WebSocket 会话高效判断后端统计数据是否有更新。
-
-    Args:
-        instance: 实例名称。
-
-    Returns:
-        str: 由各文件修改时间及文件大小拼接而成的指纹字符串。
-    """
+def get_statistics_fingerprint(instance: str, directory=None) -> str:
+    """检测总库、已提交 WAL 和实例配置的修改时间与大小。"""
+    database = get_database(directory)
     parts = []
-    # 1. 资源快照数据库 (azurstats_local.db)
-    res_db = './config/azurstats_local.db'
-    try:
-        stat = os.stat(res_db)
-        parts.append(f"res:{stat.st_mtime_ns}:{stat.st_size}")
-    except OSError:
-        parts.append("res:none")
-
-    # 2. 实例配置文件 (config/<instance>.json)
-    cfg_file = f'./config/{instance}.json'
-    try:
-        stat = os.stat(cfg_file)
-        parts.append(f"cfg:{stat.st_mtime_ns}")
-    except OSError:
-        parts.append("cfg:none")
-
-    # 3. 大世界与委托记录库 (cl1_record.db)
-    cl1_db = './config/cl1_record.db'
-    try:
-        stat = os.stat(cl1_db)
-        parts.append(f"cl1:{stat.st_mtime_ns}")
-    except OSError:
-        parts.append("cl1:none")
-
-    # 4. 舰船经验统计文件 (log/ship_exp_stats.json)
-    ship_file = './log/ship_exp_stats.json'
-    try:
-        stat = os.stat(ship_file)
-        parts.append(f"ship:{stat.st_mtime_ns}")
-    except OSError:
-        parts.append("ship:none")
-
+    for label, path in (('business', database.path), ('wal', database.path.with_name(database.path.name + '-wal')),
+                        ('config', database.directory / (instance + '.json'))):
+        try:
+            stat = path.stat()
+            parts.append(f'{label}:{stat.st_mtime_ns}:{stat.st_size}')
+        except OSError:
+            parts.append(label + ':none')
     return ';'.join(parts)
 
 
+@configured_database
 def refresh_loot(configs, instance: str) -> dict:
     """重新计算已有本地掉落记录，复用旧界面刷新操作。
 
@@ -100,6 +67,46 @@ def table(title: str, columns: list[str], rows: list[list], note: str = '', defa
     return result
 
 
+# 1970-01-01 的日期序数：与日期序数相减即可得到协调世界时秒数。
+EPOCH_ORDINAL = 719163
+
+
+def wallclock_micros(timestamp: datetime) -> int:
+    """把墙上时钟编码为微秒整数：按协调世界时解释，客户端同样按协调世界时取回，换时区访问也不偏移。"""
+    seconds = (timestamp.toordinal() - EPOCH_ORDINAL) * 86400         + timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
+    return seconds * 1000000 + timestamp.microsecond
+
+
+def compact_axis(series_list: list) -> dict:
+    """时间轴完全一致时改列式下发：共用一份时间轴，数值按序列成数组。
+
+    九条资源序列取自同一批快照，时刻逐点相同；逐点各带一份时间戳会造成九倍重复。
+    轴不一致（其它分类可能不同源）或没有点时按逐点形式返回，避免前端对不齐。
+
+    Args:
+        series_list: 报表里的序列列表。
+
+    Returns:
+        dict: 含 axis 与列式 series，或原样的 series。
+    """
+    if not series_list or not series_list[0]['points']:
+        return {'series': series_list}
+    times = [point['t'] for point in series_list[0]['points']]
+    if any([point['t'] for point in item['points']] != times for item in series_list):
+        return {'series': series_list}
+    columns = []
+    for item in series_list:
+        column = {'key': item['key'], 'label': item['label'],
+                  'values': [point['v'] for point in item['points']]}
+        if item.get('icon'):
+            column['icon'] = item['icon']
+        sources = [point.get('s', '') for point in item['points']]
+        if any(sources):
+            column['sources'] = sources
+        columns.append(column)
+    return {'axis': times, 'series': columns}
+
+
 def series(rows: list[dict], key: str, label: str) -> dict:
     """提取时间线序列数据，保留真实采集时间与来源，跳过无效值。
 
@@ -122,9 +129,11 @@ def series(rows: list[dict], key: str, label: str) -> dict:
                 continue
         except (KeyError, ValueError, TypeError):
             continue
-        points.append({'time': timestamp.isoformat(sep=' '), 'value': float(value),
-                       'source': row.get('source', '')})
-    points.sort(key=lambda item: item['time'])
+        point = {'t': wallclock_micros(timestamp), 'v': float(value)}
+        if row.get('source'):
+            point['s'] = row['source']
+        points.append(point)
+    points.sort(key=lambda item: item['t'])
     return {'key': key, 'label': label, 'points': points}
 
 
@@ -178,8 +187,31 @@ def _month_end(moment: datetime) -> datetime:
     return (moment.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 
+def _trend_window(selected: datetime, now: datetime, period: str, days: int) -> tuple:
+    """给出资源类趋势窗口的起止时间：日取最近 N 天，周取本周，月取选定月份。"""
+    if period == 'month':
+        start = selected.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # 窗口两端都含，上界取本月最后一刻。
+        return start, _month_end(start) - timedelta(microseconds=1)
+    if period == 'week':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=now.weekday())
+        return start, now
+    return now - timedelta(days=days), now
+
+
+@configured_database
 def report(configs, instance: str, category: str, month: str, days: int, period: str,
-           research_series: int = 0, research_scope: str = 'series', loot_task: str = None) -> dict:
+           research_series: int = 0, research_scope: str = 'series', loot_task: str = None,
+           include_series: bool = True) -> dict:
+    """生成并获取指定维度的统计报表。"""
+    configs.path(instance)
+    return _report(configs, instance, category, month, days, period,
+                   research_series, research_scope, loot_task, include_series)
+
+
+def _report(configs, instance: str, category: str, month: str, days: int, period: str,
+            research_series: int = 0, research_scope: str = 'series', loot_task: str = None,
+            include_series: bool = True) -> dict:
     """生成并获取指定维度的统计报表。
 
     支持资源变动趋势、大世界运营、委托收益、舰船经验以及科研和大世界掉落明细。
@@ -187,7 +219,7 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
     Args:
         configs: 配置管理服务实例。
         instance: 实例名称。
-        category: 统计分类（resources, opsi, action, commission, ships, research, loot）。
+        category: 统计分类（resources, opsi, action, commission, ships, research, loot, storage）。
         month: 目标月份，格式为 ``YYYY-MM``。
         days: 趋势查询天数。
         period: 汇总周期（day, week, month）。
@@ -201,7 +233,6 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
     Raises:
         ApiError: 月份格式错误或超出有效年份范围 (INVALID_PARAMS)。
     """
-    configs.path(instance)
     now = datetime.now()
     try:
         selected = datetime.strptime(month, '%Y-%m') if month else now.replace(day=1)
@@ -220,19 +251,57 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
             entry['icon'] = icon
         result['metrics'].append(entry)
 
+    if category == 'storage':
+        from pathlib import Path
+        from module.statistics.storage_snapshot import get_storage_timeline, latest_snapshot
+        from module.storage.statistics_recognition import StorageCatalog
+        catalog = StorageCatalog()
+        database = getattr(configs, 'database', None) or get_database(Path(configs.path(instance)).parent)
+        snapshot = latest_snapshot(instance, database=database)
+        icons = {item['id']: 'storage:' + item['templates'][0].removeprefix('assets/stats/').removesuffix('.png')
+                 for item in catalog.items}
+        if snapshot is None:
+            result['notes'].append('尚未运行仓库统计任务。运行并完成完整扫描后才会更新物品数量。')
+            items = [dict(item, amount=None) for item in catalog.items]
+        else:
+            items = snapshot['items']
+            result['notes'].append(f"最近完整扫描：{snapshot['finished_at']}；服务器：{snapshot['server']}；复核 {snapshot['pages']} 页。")
+            if snapshot['catalog_version'] != catalog.version:
+                result['notes'].append('模板目录已更新，当前显示上次扫描结果，请重新运行仓库统计任务。')
+        result['notes'].append('刷新只读取已有快照；未发现的物品显示“未发现”，不把无法确认的数量当成 0。')
+        result['tables'] = [table('仓库物品', ['图标', '物品', '分类', '数量', '状态'],
+            [[icons.get(item['id'], ''), item['name'], item['group'], item['amount'],
+              '未扫描' if snapshot is None else '已复核' if item['amount'] is not None else '未发现']
+             for item in items])]
+        result['tables'][0]['note'] = ' '.join(result['notes'])
+        if include_series:
+            start, end = _trend_window(selected, now, period, days)
+            rows = (get_storage_timeline(instance, since=start.isoformat(sep=' '), until=end.isoformat(sep=' '),
+                                         through_id=snapshot['id'], database=database) if snapshot else [])
+            if len(rows) > 50000:
+                rows = rows[-50000:]
+                result['notes'].append('记录超过 50,000 条，当前展示最近 50,000 条，请缩短时间范围查看细节。')
+            result['series'] = [dict(series(rows, item['id'], item['name']), icon=icons[item['id']])
+                                for item in catalog.items]
+            result['notes'].append('趋势与原始记录只包含成功扫描中已确认的数量；未发现的物品不补为零。')
+        return result
+
     if category == 'resources':
-        from module.statistics.resource_stats import RESOURCE_COLUMNS, get_resource_timeline
-        rows = get_resource_timeline(instance, limit=50001)
-        cutoff = (now - timedelta(days=days)).isoformat(sep=' ')
-        rows = [row for row in rows if str(row['ts']).replace('T', ' ') >= cutoff]
-        if len(rows) > 50000:
-            result['notes'].append('记录超过 50,000 条，当前展示最近 50,000 条，请缩短时间范围查看细节。')
-            rows = rows[-50000:]
-        resource_items = [
-            (name, key) for name, key in RESOURCE_COLUMNS.items()
-            if name not in ('ActionPoint', 'YellowCoin', 'PurpleCoin')
-        ]
-        result['series'] = [series(rows, key, RESOURCE_LABELS[name]) for name, key in resource_items]
+        if include_series:
+            from module.statistics.resource_stats import RESOURCE_COLUMNS, get_resource_timeline
+            start, end = _trend_window(selected, now, period, days)
+            # 窗口过滤下推到 SQL，只读窗口内的行。
+            # 该分类展示的序列不含大世界货币，跳过密文解密（它们是资源快照里解密开销最大的一批）。
+            rows = get_resource_timeline(instance, limit=50001, since=start.isoformat(sep='T'),
+                                         until=end.isoformat(sep='T'), include_opsi=False)
+            if len(rows) > 50000:
+                result['notes'].append('记录超过 50,000 条，当前展示最近 50,000 条，请缩短时间范围查看细节。')
+                rows = rows[-50000:]
+            resource_items = [
+                (name, key) for name, key in RESOURCE_COLUMNS.items()
+                if name not in ('ActionPoint', 'YellowCoin', 'PurpleCoin')
+            ]
+            result['series'] = [series(rows, key, RESOURCE_LABELS[name]) for name, key in resource_items]
         return result
 
     from module.statistics.cl1_database import db
@@ -276,13 +345,15 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
         from module.statistics.opsi_month import get_ap_timeline, get_coins_timeline
         ap = get_ap_timeline(year, month_number, instance)
         coins = get_coins_timeline(year, month_number, instance)
-        ap_normalized = [
-            {**row, 'ap': row['ap_total'] if row.get('ap_total') is not None else row.get('ap')}
-            for row in ap
-        ]
-        result['series'] = [series(ap_normalized, 'ap', '行动力'), series(ap, 'asset', '行动力资产'),
-                            series(ap, 'distance', '海里数'), series(coins, 'yellow_coins', '作战补给凭证'),
-                            series(coins, 'purple_coins', '特别兑换凭证')]
+        ap_normalized = []
+        for row in ap:
+            # 兼容已有当前读数与缓存估计记录：保留海里数，排除总行动力及资产曲线。
+            total = row.get('ap_total') if row.get('source') != 'hazard1_estimate' else None
+            ap_normalized.append({**row, 'ap': total, 'asset': row.get('asset') if total is not None else None})
+        if include_series:
+            result['series'] = [series(ap_normalized, 'ap', '行动力'), series(ap_normalized, 'asset', '行动力资产'),
+                                series(ap, 'distance', '海里数'), series(coins, 'yellow_coins', '作战补给凭证'),
+                                series(coins, 'purple_coins', '特别兑换凭证')]
     elif category == 'commission':
         from module.statistics.commission_income_stats import get_commission_income_interval_summary
         start = selected.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -311,7 +382,8 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
         result['tables'].append(table('委托结算记录', ['时间', '委托数量', '钻石', '魔方', '心智单元', '石油', '物资'],
             [[item['ts'], item.get('commission_count', 1), *[item['items'].get(k) for k in ('Gem', 'Cube', 'Chip', 'Oil', 'Coin')]] for item in normalized],
             default_sort={'index': 0, 'descending': True}))
-        result['series'] = [series([{'ts': item['ts'], **item['items']} for item in normalized], k, labels[k]) for k in ('Gem', 'Cube', 'Chip', 'Oil', 'Coin')]
+        if include_series:
+            result['series'] = [series([{'ts': item['ts'], **item['items']} for item in normalized], k, labels[k]) for k in ('Gem', 'Cube', 'Chip', 'Oil', 'Coin')]
     elif category == 'ships':
         from module.statistics.ship_exp_stats import ShipExpStats
         from module.statistics.opsi_month import get_opsi_stats
@@ -332,7 +404,8 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
             [[p.get(k) for k in ('position', 'level', 'current_exp', 'total_exp', 'target_exp', 'battles_done', 'exp_needed', 'battles_needed', 'time_needed')] for p in progress],
             f"上次检测：{data.get('last_check_time', '尚未检测')}；舰队：{data.get('fleet_index', '—')}。"))
         daily = [{'ts': key, **value} for key, value in sorted(data.get('daily_stats', {}).items())]
-        result['series'] = [series(daily, 'total_exp_gained', '每日经验'), series(daily, 'battle_count', '每日战斗'), series(daily, 'total_run_time', '每日运行秒数')]
+        if include_series:
+            result['series'] = [series(daily, 'total_exp_gained', '每日经验'), series(daily, 'battle_count', '每日战斗'), series(daily, 'total_run_time', '每日运行秒数')]
     elif category == 'research':
         from module.statistics.research_stats import (
             CONSUMABLE_ITEMS, collect, item_info, RARITY_LABELS, SCOPE_SERIES)
@@ -462,11 +535,11 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
         detail_columns = ['图标', '物品', '稀有度', '总收益', '掉落记录数', '平均每次掉落']
         record_columns = ['时间', '任务', '海域', '掉落物']
         title = '大世界掉落明细'
-        note = ('暂时只统计金菜（通用/主炮/鱼雷/防空炮/舰载机 部件T4）与彩图纸'
-                '（舰炮/鱼雷/防空炮/舰载机 研发图纸UR型）；其他物品照常入库，只是不在这里展示。'
+        note = ('统计金菜（部件T4）、装备研发图纸SSR/UR型、六种金色研发材料、'
+                '机密/绝密实验计划及特装型突破部件；其他物品照常入库，只是不在这里展示。'
                 '统计在任务跑完解析掉落时完成：把该任务的「掉落截图」设为保存或上传均可'
                 '（两者都统计，区别只是要不要把截图落盘）。')
-        # 任务筛选下拉的数据源：有掉落开关的任务固定列出，其余任务掉了东西才出现
+        # 独立或共用掉落开关的任务始终可选，次数不受当前任务筛选影响。
         result['taskOptions'] = summary['tasks']
         if not summary['record_count']:
             result['tables'].append(table(title, detail_columns, [], note=(
@@ -495,7 +568,7 @@ def report(configs, instance: str, category: str, month: str, days: int, period:
             ))
             result['tables'].append(table(
                 '掉落记录', record_columns, summary['records'][:200],
-                note='按时间倒序；只列掉了金菜或彩图纸的记录，其余掉落不入这张表。'
+                note='按时间倒序；只列含上述统计物品的掉落记录，其余掉落不入这张表。'
                      + ('记录超过 200 条，只显示最近 200 条。' if len(summary['records']) > 200 else ''),
                 default_sort={'index': 0, 'descending': True},
             ))

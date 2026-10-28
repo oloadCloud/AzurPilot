@@ -13,6 +13,8 @@
 
 它们都被 [调度器](../entry/alas.md) 的异常恢复链调用：异常 → 记日志（error_context）→ 保存错误现场（触发 LLM 分析）→ 推送通知（OnePush + WebUI 双通道）→ 决定恢复或等待服务器。理解这条链是读懂任何崩溃日志的前提。
 
+普通统计数值日志与既有 CL1 遥测保留；所有 Rich 异常渲染关闭 `tracebacks_show_locals`，避免敏感运行状态随局部变量落盘。
+
 ## 2. 模块职责
 
 ### 负责
@@ -86,7 +88,7 @@ module/
 3. 特殊渠道修正：`Custom` 渠道强制 JSON 并注入 `data.title`/`data.content`（支持 `${content}` 占位符）；go-cqhttp 把 `access_token` 映射为 `token` 并解析响应中的失败状态。
 4. 发送失败一律只记日志并返回 `False`：onepush 内部吞掉请求异常时返回 `None`，必须显式检查，否则推送不可达时日志里无失败痕迹。
 
-`notify_webui` 是独立通道：读部署配置的 `WebuiPort`（默认 25548），向本机 `/api/notify` 发 2 秒超时的 POST，异常静默。业务方几乎总是双通道一起调用——OnePush 送达手机，WebUI 送达正在看启动器的用户。
+`notify_webui` 是独立通道：读部署配置的 `WebuiPort`（默认 25548），向本机 `/api/notify` 发 2 秒超时的 POST，异常静默。业务方几乎总是双通道一起调用——OnePush 送达手机，WebUI 送达正在看页面的用户：`/api/notify` 收到后兵分两路，经 notify_hub 以 `notifications` 主题实时广播给浏览器（前端 Notification API 弹 Windows 原生通知），同时进队列供外部启动器经 `/api/notify_stream`（SSE）订阅。
 
 调度器额外套了一层**低推送量模式**：`alas.py` 的可恢复异常分支（`GameNotRunningError`、`EmulatorNotRunningError`、`GameStuckError`、`GamePageUnknownError`、未满 3 次的 `ScriptError`、`RequestHumanTakeover`、`AutoSearchSetError` 与兜底 `Exception`）统一经 `_notify_recoverable()` 发双通道；开启 `Error_LowPushMode` 时该方法是空操作，只记一条 info 日志。这些错误都会被自动重启游戏/模拟器消化，逐个推送会在无人值守时形成轰炸。需要人工介入的路径（`_check_sensitive_exit`、`ScriptError` 满 3 次退出、调度循环的任务连败判定）仍直接调用 `handle_notify`，不受该模式影响。
 
@@ -104,8 +106,8 @@ module/
 
 全局 `logging.getLogger('alas')`，级别 INFO（模块常量 `logger_debug` 默认关闭）。导入即完成初始化：stdout/stderr 重配为 UTF-8、把 `logging.basicConfig` 替换为空函数（防 cnocr 在 root logger 上重复输出）、`os.chdir` 到仓库根目录、挂控制台处理器并执行首次 `set_file_logger()`。三个 sink 各自独立：
 
-- **控制台**：`RichHandler`，本地调试用；Electron 环境下会被移除。
-- **文件**：`RichTimedRotatingHandler`，每天午夜轮转到 `./log/<日期>_<实例名>.txt`；保留份数与过期处理方式读自 `./config/<实例>.json` 的 `General.Log`，过期文件在 daemon 线程中按 `LogBackUpMethod` 移入 `./log/bak/`（压缩/复制）或删除。每个进程只挂一次（幂等），Windows 下 SyncManager/MainProcess 等辅助进程跳过。
+- **控制台**：`RichHandler`，本地调试用；Electron、TUI 与 WebUI 子进程用 `set_console_logger(False)` 关闭。
+- **文件**：`RichTimedRotatingHandler`，每天午夜轮转到 `./log/<日期>_<实例名>.txt`；保留份数与过期处理方式读自 `./config/<实例>.json` 的 `General.Log`，过期文件在 daemon 线程中按 `LogBackUpMethod` 移入 `./log/bak/`（压缩/复制）或删除。每个进程只挂一次（幂等），Windows 下 SyncManager/MainProcess 等辅助进程跳过。WebUI 子进程用 `set_file_logger('webui')` 只写 `./log/<日期>_webui.txt`，不动 stdout/stderr，任务子进程照常继承控制台。
 - **WebUI**：`set_func_logger(q.put)` 把每条日志渲染成 Rich 渲染对象塞进 multiprocessing 队列 → `ProcessManager` 消费线程存入 `renderables` 列表（上限约 400 条）→ API 的 `logs()` 方法用无色 Console 把渲染对象捕获为文本、正则提取日志级别，前端经 WebSocket `logs.get` 按游标增量拉取。
 
 高频 API 的分级语义（全项目通用约定）：
@@ -124,7 +126,7 @@ module/
 
 ### 服务器状态检查（server_status 与 server_checker）
 
-两个文件刻意分层：`server_status.py` 是**协议层**——无状态、无缓存、无框架依赖，直接对各地区游戏网关发 10018 请求并解析 10019 响应（手写 protobuf varint 解码；cn_ios/渠道服走原始 HTTP JSON），把状态数字映射为 `normal/maintenance/full/reg_full/unopened`。`server_checker.py` 是**策略层**——`ServerChecker` 优先查公共 API（server-checker.nanoda.work，15 秒超时），404 时回退本地服务器列表判定，连接失败再直连游戏网关兜底，两者都不可达才进入快速重试（先探测百度区分「本机断网」与「API 故障」，再重试 3 次）。
+两个文件刻意分层：`server_status.py` 是**协议层**——无状态、无缓存、无框架依赖，直接对各地区游戏网关发 10018 请求并解析 10019 响应（手写 protobuf varint 解码；cn_ios/渠道服走原始 HTTP JSON），把状态数字映射为 `normal/maintenance/full/reg_full/unopened`。`server_checker.py` 是**策略层**——`ServerChecker` 优先查公共 API（server-checker.nanoda.work，连接和读取超时各 3 秒，避免慢接口长时间阻塞任务启动），404 时回退本地服务器列表判定；连接失败、超时或返回 429/5xx 时记录切换提示，再直连游戏网关兜底，两者都不可达才进入快速重试（先探测百度区分「本机断网」与「API 故障」，再重试 3 次）。3 秒是单阶段超时，不是整个检查过程的总时限；游戏网关自身的超时及维护等待规则不变。
 
 `alas.loop` 每轮取任务前调用 `checker.wait_until_available()`：服务器维护或 API 与网关都不可达时，检查间隔从 2 分钟逐步退避到 10 分钟，循环阻塞在此不推进任务；`is_recovered()` 在恢复瞬间返回一次 `True`，调度器随即刷新配置并注入 Restart 任务（阻塞期间游戏状态必然已失效）。`GamePageUnknownError` 处理路径也用它分流：服务器可用 → 当作页面识别问题重启游戏；不可用 → 等待维护结束。服务器配置为 `disabled`（默认值）时检查器恒返回可用。
 
@@ -136,7 +138,7 @@ module/
 | --- | --- |
 | 调度器 `alas.py` | 异常恢复链的主要消费方：各 except 分支双通道推送，错误现场触发 LLM 分析，循环头部做服务器检查 |
 | 战役/委托/秘书舰等业务 | 收益与状态事件推送（委托奖励、秘书舰替换、作战委托冲突等） |
-| 大世界智能调度+ | `notify_push` 统一封装启动器推送与 OnePush（可独立渠道） |
+| 大世界智能调度 | `notify_push` 统一封装启动器推送与 OnePush（可独立渠道） |
 | 日报服务 | 复用 `Error_Llm*` 配置生成日报，并经 `handle_notify` 推送（最多 3 次重试） |
 | WebUI 进程管理 | worker 启动时调用 `set_file_logger` / `set_func_logger`，消费日志队列 |
 
@@ -164,7 +166,7 @@ module/
 | `Alas.Error.SaveError` / `SaveErrorRetentionDays` / `SaveErrorBackUpMethod` / `SaveErrorZipMethod` | checkbox / 数值 / 选项 | true / 30 / zip / zip | 错误现场保存；过期天数（0 = 不清理）、过期处理方式（delete/copy/zip）与压缩格式，备份落 `log/error/<实例>/bak/`；LLM 分析在保存流程最前执行 |
 | `Alas.Emulator.ServerName` | 选项 | `disabled` | 服务器检查目标；disabled 跳过检查 |
 | `Secretary.Secretary.Notify` / `OnePushConfig` | checkbox / YAML | true / `provider: null` | 秘书舰推送，专用配置留空回退全局 OnePushConfig |
-| `OpsiGeneral.OpsiGeneral.LauncherPush` / `NotifyOpsiMail` / `IndependentPush` / `OpsiOnePushConfig` | — | true / true / false / `provider: null` | 大世界智能调度+的启动器/OnePush 双通道与独立渠道 |
+| `OpsiGeneral.OpsiGeneral.LauncherPush` / `NotifyOpsiMail` / `IndependentPush` / `OpsiOnePushConfig` | — | true / true / false / `provider: null` | 大世界智能调度的启动器/OnePush 双通道与独立渠道 |
 | `Commission.CommissionNotifyReward` / `GemNotify` | checkbox | false / true | 委托奖励、钻石委托推送开关 |
 | `General.Log.LogKeepCount` / `LogBackUpMethod` / `ZipMethod` | — | 3 / zip / zip | 文件日志保留份数、过期处理（delete/copy/zip）与压缩格式 |
 

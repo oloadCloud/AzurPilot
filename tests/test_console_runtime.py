@@ -3,6 +3,7 @@ import asyncio
 import base64
 import io
 import multiprocessing
+import queue
 import tempfile
 import unittest
 from datetime import datetime
@@ -15,7 +16,7 @@ from PIL import Image
 
 from module.api.runtime_service import RuntimeService
 from module.api.socket import Gateway, Session
-from module.api.statistics_service import report, series
+from module.api.statistics_service import report, series, wallclock_micros
 from module.runtime.preview import PreviewHub
 
 
@@ -144,6 +145,60 @@ class RuntimeTests(unittest.TestCase):
                     self.assertIs(frame, device.screenshot())
                     publish.assert_called_once_with(frame)
 
+    def test_preview_copy_memory_failure_preserves_screenshot_and_next_frame(self):
+        from module.device.screenshot import Screenshot
+        from module.runtime import preview
+
+        class CopyFailure(np.ndarray):
+            def copy(self, *args, **kwargs):
+                raise MemoryError('模拟预览副本分配失败')
+
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8).view(CopyFailure)
+        device = Screenshot.__new__(Screenshot)
+        device.config = SimpleNamespace(Emulator_ScreenshotMethod='test', Emulator_ScreenshotDedithering=False,
+                                        Error_SaveError=False)
+        backend = Mock(return_value=frame)
+        device.__dict__['screenshot_methods'] = {'test': backend}
+        device._screenshot_interval = Mock()
+        device.check_screen_size = device.check_screen_black = lambda: True
+        pending = queue.Queue(maxsize=1)
+        with patch.object(preview, '_images', pending):
+            self.assertIs(frame, device.screenshot())
+            self.assertTrue(pending.empty())
+            recovered = np.full((720, 1280, 3), 100, np.uint8)
+            backend.return_value = recovered
+            self.assertIs(recovered, device.screenshot())
+            copied, timestamp = pending.get_nowait()
+            self.assertIsNot(copied, recovered)
+            np.testing.assert_array_equal(copied, recovered)
+            self.assertTrue(timestamp)
+            backend.side_effect = MemoryError('模拟真实截图分配失败')
+            with self.assertRaisesRegex(MemoryError, '真实截图'):
+                device.screenshot()
+            self.assertTrue(pending.empty())
+
+    def test_preview_encoder_recovers_after_memory_failure(self):
+        from module.runtime import preview
+
+        class EncoderDone(Exception):
+            pass
+
+        pixels = np.full((720, 1280, 3), (235, 30, 10), dtype=np.uint8)
+        images = SimpleNamespace(get=Mock(side_effect=[(pixels, 'failed'), (pixels, 'recovered'), EncoderDone()]))
+        output = queue.Queue(maxsize=2)
+        with patch.object(preview, '_images', None), patch.object(preview.queue, 'Queue', return_value=images), \
+                patch.object(preview.threading, 'Thread') as thread, \
+                patch('module.runtime.worker_events.initialize'), \
+                patch('PIL.Image.fromarray', side_effect=[MemoryError('模拟预览编码分配失败'), Image.fromarray(pixels)]):
+            preview.initialize('pilot', output, lambda _: None, 'test-run')
+            with self.assertRaises(EncoderDone):
+                thread.call_args.kwargs['target']()
+        frame = output.get_nowait()
+        self.assertEqual(frame['capturedAt'], 'recovered')
+        self.assertEqual(frame['runId'], 'test-run')
+        self.assertTrue(frame['image'].startswith('data:image/jpeg;base64,'))
+        self.assertTrue(output.empty())
+
     def test_slow_preview_replaces_frame_without_filling_control_queue(self):
         async def check():
             session = Session(Gateway(None, ''), SimpleNamespace(close=AsyncMock()))
@@ -175,10 +230,26 @@ class RuntimeTests(unittest.TestCase):
 
 
 class StatisticsTests(unittest.TestCase):
+    def setUp(self):
+        from tests.opsi_test_support import install_store
+        from module.statistics.cl1_database import Cl1Database
+        from module.statistics.ship_exp_stats import ShipExpStats
+        from module.statistics.azurstats import AzurStats
+        directory = self.enterContext(tempfile.TemporaryDirectory(ignore_cleanup_errors=True))
+        self.root = Path(directory)
+        self.vault = install_store(self, directory)
+        database = Cl1Database(self.root / 'config/cl1_data.db')
+        self.enterContext(patch('module.statistics.cl1_database.db', database))
+        self.enterContext(patch('module.statistics.opsi_month.cl1_db', database))
+        self.enterContext(patch.object(AzurStats, 'LOCAL_DB', str(self.root / 'config/azurstats_local.db')))
+        self.enterContext(patch('module.statistics.ship_exp_stats.ShipExpStats',
+            side_effect=lambda **kwargs: ShipExpStats(
+                path=kwargs.pop('path', self.root / 'log/cl1/pilot/ship_exp_data.json'), **kwargs)))
+
     def test_series_keeps_zero_skips_missing_and_sorts(self):
         data = series([{'ts': '2026-09-13 12:00:00', 'ap': 0}, {'ts': '2026-09-13 10:00:00', 'ap': 10},
                        {'ts': '2026-09-13 11:00:00'}, {'ts': 'bad', 'ap': 2}, {'ts': '2026-09-13', 'ap': float('nan')}], 'ap', '行动力')
-        self.assertEqual([10, 0], [point['value'] for point in data['points']])
+        self.assertEqual([10, 0], [point['v'] for point in data['points']])
 
     def test_opsi_preserves_old_rounding_and_five_ap_cost(self):
         summary = {'total_battles': 5, 'akashi_encounters': 2, 'siren_research_devices': 1}
@@ -202,7 +273,7 @@ class StatisticsTests(unittest.TestCase):
         self.assertEqual(['短猫运行统计'], [item['title'] for item in result['tables']])
 
     def test_action_sources_and_commission_records_keep_time_and_scope(self):
-        raw = {'ap_snapshots': [{'ts': '2026-09-01 12:00:00', 'ap': 0, 'asset': 50, 'distance': 100, 'source': 'cl1'}],
+        raw = {'ap_snapshots': [{'ts': '2026-09-01 12:00:00', 'ap': 0, 'ap_total': 0, 'asset': 50, 'distance': 100, 'source': 'cl1'}],
                'coins_snapshots': [{'ts': '2026-09-02 13:00:00', 'yellow_coins': 200, 'purple_coins': 5}]}
         entries = [{'ts': '2026-09-01 12:00:00', 'commission_count': 2, 'items': {'Gems': 7, 'Cubes': 3}},
                    {'ts': '2026-09-02 12:00:00', 'commission_count': 1, 'items': {}},
@@ -214,28 +285,28 @@ class StatisticsTests(unittest.TestCase):
                 patch('module.statistics.commission_income_stats.cl1_db', database):
             action = report(configs, 'pilot', 'action', '2026-09', 7, 'month')
             self.assertEqual(5, len(action['series']))
-            self.assertEqual(0, action['series'][0]['points'][0]['value'])
-            self.assertEqual('2026-09-02 13:00:00', action['series'][3]['points'][0]['time'])
+            self.assertEqual(0, action['series'][0]['points'][0]['v'])
+            self.assertEqual(wallclock_micros(datetime(2026, 9, 2, 13, 0, 0)), action['series'][3]['points'][0]['t'])
             income = report(configs, 'pilot', 'commission', '2026-09', 7, 'month')
             metrics = {item['label']: item['value'] for item in income['metrics']}
             self.assertEqual(7, metrics['钻石'])
             self.assertEqual(3, metrics['完成委托'])
             self.assertEqual(2, len(income['tables'][1]['rows']))
             self.assertEqual({'index': 0, 'descending': True}, income['tables'][1]['defaultSort'])
-            self.assertEqual(3, income['series'][1]['points'][0]['value'])
+            self.assertEqual(3, income['series'][1]['points'][0]['v'])
             database.get_commission_income.assert_called_with('pilot', 2026, 9)
 
     def test_ship_progress_and_daily_efficiency_are_exposed(self):
         from module.statistics.ship_exp_stats import ShipExpStats
         with tempfile.TemporaryDirectory() as directory:
-            stats = ShipExpStats(path=Path(directory) / 'ships.json')
+            stats = ShipExpStats(path=self.root / 'log/cl1/pilot/ship_exp_data.json')
             stats.data = {'target_level': 125, 'ships': [{'position': 1, 'level': 100, 'current_exp': 500, 'total_exp': 100000}],
                           'daily_stats': {'2026-09-01': {'battle_count': 10, 'total_exp_gained': 1000, 'total_run_time': 500}}}
             with patch('module.statistics.ship_exp_stats.ShipExpStats', return_value=stats), \
                     patch('module.statistics.opsi_month.get_opsi_stats', return_value=SimpleNamespace(summary=lambda: {'total_battles': 10})):
                 result = report(SimpleNamespace(path=lambda _: None), 'pilot', 'ships', None, 7, 'month')
             self.assertEqual(9, len(result['tables'][0]['rows'][0]))
-            self.assertEqual(1000, result['series'][0]['points'][0]['value'])
+            self.assertEqual(1000, result['series'][0]['points'][0]['v'])
 
     def test_loot_keeps_legacy_columns_and_refreshes_local_cache(self):
         from module.api.statistics_service import refresh_loot

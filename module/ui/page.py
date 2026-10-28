@@ -23,6 +23,7 @@ import traceback
 from module.coalition.assets import *
 from module.event_hospital.assets import HOSIPITAL_CHECK
 from module.freebies.assets import MAIL_ENTER
+from module.limit_challenge.assets import CHALLENGE_PREPARATION
 from module.raid.assets import *
 from module.retire.assets import DOCK_CHECK
 from module.secretary.assets import *
@@ -147,6 +148,14 @@ page_campaign_menu.link(button=GOTO_MAIN, destination=page_main)
 page_campaign.link(button=GOTO_MAIN, destination=page_main)
 page_campaign.link(button=BACK_ARROW, destination=page_campaign_menu)
 page_fleet.link(button=GOTO_MAIN, destination=page_main)
+
+# 限界挑战与专用编队页，返回时不能误用每日出击入口。
+page_limit_challenge = Page(LIMIT_CHALLENGE_CHECK)
+page_campaign_menu.link(button=CAMPAIGN_MENU_GOTO_LIMIT_CHALLENGE, destination=page_limit_challenge)
+page_limit_challenge.link(button=BACK_ARROW, destination=page_campaign_menu)
+page_limit_challenge.link(button=GOTO_MAIN, destination=page_main)
+page_limit_challenge_preparation = Page(CHALLENGE_PREPARATION)
+page_limit_challenge_preparation.link(button=BACK_ARROW, destination=page_limit_challenge)
 
 # 主界面（白色主题）
 # 2024.05.22, 新 UI 中 MAIN_GOTO_CAMPAIGN_WHITE 是主界面最后显示的按钮
@@ -334,6 +343,9 @@ page_dorm.link(button=DORM_GOTO_MAIN, destination=page_main)
 # 秘书舰
 page_profile = Page(PROFILE_CHECK)
 page_secretary_group = Page(SECRETARY_GROUP_CHECK)
+# 经典主界面与新版白色主界面的头像都在左上角同一位置，点击即进入个人资料页；
+# 只给白色主界面建链接时，经典主界面无法导航到 page_profile，秘书舰任务卡死
+page_main.link(button=MAIN_GOTO_PROFILE, destination=page_profile)
 page_main_white.link(button=MAIN_GOTO_PROFILE, destination=page_profile)
 page_profile.link(button=SECRETARY_BUTTON, destination=page_secretary_group)
 page_secretary_group.link(button=BACK_ARROW, destination=page_profile)
@@ -349,7 +361,7 @@ page_academy = Page(ACADEMY_CHECK)
 page_dormmenu.link(button=DORMMENU_GOTO_ACADEMY, destination=page_academy)
 page_academy.link(button=GOTO_MAIN, destination=page_main)
 
-# 私人休息室
+# 宿舍计划
 page_private_quarters = Page(PRIVATE_QUARTERS_CHECK)
 page_dormmenu.link(button=DORMMENU_GOTO_PRIVATE_QUARTERS, destination=page_private_quarters)
 page_private_quarters.link(button=PQ_GOTO_MAIN, destination=page_main)

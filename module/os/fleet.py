@@ -46,7 +46,11 @@ from module.os_ash.ash import OSAsh
 from module.os_combat.combat import Combat
 from module.os_combat.assets import SIREN_PREPARATION
 from module.combat.assets import BATTLE_PREPARATION
-from module.os_handler.assets import AUTO_SEARCH_REWARD, CLICK_SAFE_AREA, IN_MAP, PORT_ENTER, TEMPLATE_STORAGE_SHIP_EMPTY
+from module.os_handler.assets import (
+    AUTO_SEARCH_REWARD, CLICK_SAFE_AREA, IN_MAP, PORT_ENTER, STRATEGIC_SEARCH_MAP_OPTION_OFF,
+    TEMPLATE_STORAGE_SHIP_EMPTY,
+)
+from module.os_handler.resource_state import FARMING_TASKS, effective_task
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
@@ -428,7 +432,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
         logger.info('[大世界-摄像机] 摄像机已稳定')
 
-    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True, drop=None):
+    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True,
+                               drop=None, *, allow_event_finish=False):
         """
         等待 homo_loca 稳定。DETECTION_BACKEND 必须为 'homography'。
 
@@ -438,6 +443,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             walk_out_of_step (bool): 是否捕获 walk_out_of_step 错误。
                 默认为 True，深渊海域中使用 False。
             drop (DropImage): 掉落记录对象。
+            allow_event_finish (bool): 事件检索收尾允许在完成后直接返回，定位及恢复移动默认不启用。
 
         Returns:
             str: 舰队途中遇到的事件，如 'event'、'search'、'akashi'、'combat'，
@@ -456,6 +462,10 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         # 记录剧情历史以清除点击记录
         clicked_story = False
         clicked_story_count = 0
+        fast_farming = effective_task(self.config) in FARMING_TASKS
+        completed_event = False
+        finish_without_stability = False
+        siren_confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
 
         confirm_timer.reset()
 
@@ -472,8 +482,17 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 confirm_timer.reset()
                 result.add('event')
                 if event == 'story_skip':
+                    # 领奖后仍可能出现下一组选项；旧完成标记不能越过新的剧情。
+                    completed_event = False
                     clicked_story = True
                     clicked_story_count += 1
+                    confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
+                    if fast_farming and confirmed and not siren_confirmed \
+                            and getattr(self, 'siren_device_mode', None) == 'resource':
+                        # 探测资源选项已经提交，返回地图后只确认镜头稳定，随即交给自律拾取。
+                        confirm_timer = Timer(0.8, count=2).start()
+                        record = None
+                    siren_confirmed = confirmed
                     # 清除点击记录，避免塞壬扫描装置中超过 6 个选项导致的 GameTooManyClickError
                     # 塞壬扫描装置中提交物品的流程为
                     # STORY_OPTION_2_OF_3 -> POPUP_CONFIRM_STORY_SKIP
@@ -484,13 +503,20 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                         self.device.click_record_clear()
                         clicked_story_count = 0
                 elif event == 'map_get_items':
+                    completed_event = True
                     # story_skip -> map_get_items 表示收到了深渊进度奖励
                     if clicked_story:
                         logger.info('[大世界-剧情] 从剧情获得物品')
                         self.device.click_record_clear()
                         clicked_story = False
+                        if fast_farming:
+                            # 信息装置先等后续选项和奖励出现，领奖后才缩短收尾确认。
+                            confirm_timer = Timer(0.8, count=2).start()
+                            record = None
                     clicked_story_count = 0
                 else:
+                    if event == 'map_archives':
+                        completed_event = True
                     # 处理了其他事件，清除历史记录
                     clicked_story = False
                     clicked_story_count = 0
@@ -499,11 +525,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 confirm_timer.reset()
                 continue
             if self.handle_walk_out_of_step():
+                completed_event = False
                 if walk_out_of_step:
                     raise MapWalkError('walk_out_of_step')
                 else:
                     continue
             if self.handle_popup_confirm('WALK_UNTIL_STABLE'):
+                completed_event = False
                 confirm_timer.reset()
                 continue
             if self.handle_manjuu():
@@ -512,14 +540,17 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
             # 意外点击
             if self.is_in_globe():
+                completed_event = False
                 self.os_globe_goto_map()
                 confirm_timer.reset()
                 continue
             if self.is_in_storage():
+                completed_event = False
                 self.storage_quit()
                 confirm_timer.reset()
                 continue
             if self.is_in_os_mission():
+                completed_event = False
                 self.os_mission_quit()
                 confirm_timer.reset()
                 continue
@@ -527,6 +558,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 confirm_timer.reset()
                 continue
             if self.is_in_map_order():
+                completed_event = False
                 self.order_quit()
                 confirm_timer.reset()
                 continue
@@ -536,6 +568,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 # 使用 ui_back() 进行测试，因为每月深渊日志太少。
                 # self.ui_back(check_button=self.is_in_map)
                 self.combat(expected_end=abyssal_expected_end, fleet_index=self.fleet_show_index, save_get_items=drop)
+                completed_event = True
                 confirm_timer.reset()
                 result.add('event')
                 continue
@@ -544,7 +577,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
                 self.interval_clear(PORT_SUPPLY_CHECK)
                 self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
-                confirm_timer.reset()
+                completed_event = True
+                if fast_farming:
+                    # 商店退出已确认返回地图，原先按路程计算的到达时间不再适用。
+                    confirm_timer = Timer(0.8, count=2).start()
+                    record = None
+                else:
+                    confirm_timer.reset()
                 result.add('akashi')
                 continue
 
@@ -569,6 +608,12 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 if self.is_in_map():
                     self.enemy_searching_color_initial()
 
+            # 只在最终领奖/商店退出之后的新画面直接收尾；选项提交、普通移动和恢复仍等定位。
+            if (fast_farming and allow_event_finish and completed_event and self.is_in_map()
+                    and self.match_template_color(STRATEGIC_SEARCH_MAP_OPTION_OFF, offset=(20, 20))):
+                finish_without_stability = True
+                break
+
             # 到达检测
             # 检查颜色，因为解锁时屏幕会变黑。
             # 直接使用 IN_MAP，本质上是 `self.is_in_map() and IN_MAP.match_template_color()`
@@ -587,7 +632,10 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 confirm_timer.reset()
 
         result = '_'.join(result)
-        logger.info(f'[大世界-移动] 移动已稳定, 结果: {result}')
+        if finish_without_stability:
+            logger.info(f'[大世界-移动] 事件完成且计划作战入口已确认，跳过镜头稳定等待，结果: {result}')
+        else:
+            logger.info(f'[大世界-移动] 移动已稳定, 结果: {result}')
         self.device.screenshot_interval_set()
         return result
 
@@ -1057,7 +1105,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                     logger.info('[大世界-战斗] Boss已清除')
                     if drop.count:
                         drop.add(self.device.image)
-                    self.map_exit()
+                    self.map_exit(drop=drop)
                     return True
 
                 # 待命

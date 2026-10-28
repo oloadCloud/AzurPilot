@@ -14,6 +14,8 @@ AzurPilot 的常规操作界面是 WebUI，但用户越来越倾向于让 AI 助
 
 在系统中的位置：MCP 是与 WebUI 并列的第二个对外服务。挂载模式下它是 `module/api/app.py` 创建的 Starlette 应用挂在 `/mcp` 路径下的子应用，与 WebUI 共享同一份 `ConfigService`/`RuntimeService`；独立模式下（`uv run python mcp_server_sse.py`）它自己监听 22268 端口并拥有共享状态。两种模式最终都作用于同一批实例进程（`module/runtime`）。
 
+所有运行入口在业务 worker 启动前执行 `module.persistence.database.initialize()`。首次迁移先备份、转换与检查，失败停止启动并保留旧源；总库完成标记存在而数据库丢失时必须恢复备份。模块导入不创建总库，详见 [普通业务数据存储](../infra/persistence.md)。
+
 ## 2. 模块职责
 
 ### 负责
@@ -123,6 +125,8 @@ module/config/mcp_helper.py    # McpConfigHelper：args.json + i18n 的任务元
 | 设备类 | `get_screenshot` | 模拟器当前画面，JPEG Base64，返回 `ImageContent` |
 | 设备类 | `restart_emulator` | 重启实例对应模拟器进程（含上游退出缓冲，硬超时 150 秒） |
 | 设备类 | `restart_adb` | 重启 ADB 服务（kill-server/start-server），`instance` 可选 |
+
+`get_scheduler_queue` 与 `clear_scheduler_queue` 遍历配置时只读取字典形式的任务节点，跳过 `_stockInstance` 等非字典内部元数据；清空队列仍通过配置事务修改可编辑的 `Scheduler.Enable`，保留实例身份及只读任务。
 
 ### 与 module/runtime 的关系
 

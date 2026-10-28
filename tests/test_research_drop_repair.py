@@ -10,21 +10,24 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import nullcontext
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
 from module.statistics import cl1_database as database
+from tests.opsi_test_support import install_store
 from dev_tools.research_drop_repair import load_instance_entries
 
 
 class TestResearchDropRepair(unittest.TestCase):
     def setUp(self):
-        directory = tempfile.TemporaryDirectory()
+        directory = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(directory.cleanup)
-        self.path = Path(directory.name) / 'stats.db'
-        with patch.object(database.Cl1Database, '_get_legacy_decryption_keys', return_value=[]):
+        install_store(self, directory.name)
+        self.path = Path(directory.name) / 'config' / 'cl1_data.db'
+        with nullcontext():
             self.db = database.Cl1Database(self.path)
 
     def add(self, imgid, items, stamp=datetime(2026, 9, 24, 16, 22), instance='alas',

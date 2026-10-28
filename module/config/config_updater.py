@@ -36,7 +36,9 @@ from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
 from module.config.env import IS_ON_PHONE_CLOUD
+from module.config.fleet_legacy import LEGACY_PATHS
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
+from module.config.redirect_utils.shop import migrate_shop_options
 from module.config.task_priority import get_scheduler_tasks, merge_task_priority
 from module.config.utils import *
 from module.config.redirect_utils.utils import *
@@ -70,6 +72,31 @@ WAR_ARCHIVES = ['WarArchives']
 COALITIONS = ['Coalition', 'CoalitionSp', 'CoalitionScuttle']
 MARITIME_ESCORTS = ['MaritimeEscort']
 HOSPITAL = ['Hospital', 'HospitalEvent']
+
+
+def campaign_event_options(data, args):
+    """按实例包名读取各任务的活动候选，不修改共享元数据或全局服务器。"""
+    server = to_server(deep_get(data, 'Alas.Emulator.PackageName', 'cn'))
+    options = {}
+    for task in args:
+        candidates = deep_get(args, f'{task}.Campaign.Event.option_{server}')
+        if isinstance(candidates, list):
+            options[task] = candidates
+    return options
+
+
+def refresh_campaign_events(data, args, is_template=False):
+    """在内存配置中刷新已结束的活动，保留档案选择与主线刷图语义。"""
+    options = campaign_event_options(data, args)
+    if not is_template:
+        for task in EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS:
+            candidates = options.get(task, [])
+            if candidates and deep_get(data, f'{task}.Campaign.Event', 'campaign_main') not in candidates:
+                deep_set(data, f'{task}.Campaign.Event', candidates[0])
+    for task in WAR_ARCHIVES:
+        candidates = options.get(task, [])
+        if candidates and deep_get(data, f'{task}.Campaign.Event', 'campaign_main') == 'campaign_main':
+            deep_set(data, f'{task}.Campaign.Event', candidates[0])
 
 
 class Event:
@@ -644,6 +671,22 @@ class ConfigGenerator:
 class ConfigUpdater:
     # 格式：source, target, (可选) convert_func
     redirection = [
+        ('FleetInfo', 'FleetInfo.FleetTraining.CheckIntervalHours', fleet_training_interval_redirect),
+        ('OpsiGeneral.OpsiGeneral.ActionPointCheckInterval',
+         'OpsiHazard1Leveling.OpsiHazard1Leveling.ActionPointCheckInterval'),
+        ('OpsiGeneral.OpsiGeneral.SkipStrategicSearchCheck',
+         'OpsiHazard1Leveling.OpsiHazard1Leveling.SkipStrategicSearchCheck'),
+        ('OpsiScheduling.OpsiSmartExplore.BuyActionPoint', 'OpsiScheduling.OpsiScheduling.BuyActionPoint'),
+        ('OpsiExplore.OpsiExplore.MeowfficerCleanup', 'OpsiExploreCleanup.Scheduler.Enable'),
+        ('OpsiExplore.OpsiFleet', 'OpsiExploreCleanup.OpsiFleet'),
+        ('OpsiExplore.OpsiExplore.MeowfficerCleanupState', 'OpsiExploreCleanup.OpsiExploreCleanup.State',
+         opsi_explore_cleanup_state_redirect),
+        # 保留旧开关的布尔值，关闭后不再保留任何推荐材料中的普通航母。
+        ('General.Enhance.SkipSingleCommonCV', 'General.Enhance.KeepCommonCV'),
+        ('OpsiAshBeacon.OpsiAshBeacon.OneHitMode', 'OpsiAshBeacon.OpsiAshBeacon.AssistRequestLimit',
+         meta_assist_limit_redirect),
+        ('OpsiHazard1Leveling.OpsiHazard1Leveling.RecordSeaMiles',
+         'OpsiHazard1Leveling.OpsiHazard1Leveling.RecordSeaMiles', sea_miles_interval_redirect),
         # ('OpsiDaily.OpsiDaily.BuySupply', 'OpsiShop.Scheduler.Enable'),
         # ('OpsiDaily.Scheduler.Enable', 'OpsiDaily.OpsiDaily.DoMission'),
         # ('OpsiShop.Scheduler.Enable', 'OpsiShop.OpsiShop.BuySupply'),
@@ -737,6 +780,16 @@ class ConfigUpdater:
             更新后的配置字典。
         """
         new = {}
+        # 保留尚未显式迁移的旧内容；不解析、不导入，也不作为分析数据源。
+        if not is_template:
+            missing = object()
+            for path in LEGACY_PATHS:
+                value = deep_get(old, path, missing)
+                if value is not missing:
+                    deep_set(new, path, deepcopy(value))
+        # 交易玩家身份不是可编辑参数，运行器迁移必须原样保留。
+        if not is_template and '_stockInstance' in old:
+            new['_stockInstance'] = old['_stockInstance']
 
         for keys, data in deep_iter(self.args, depth=3):
             # 跳过非字典项（叶子值，如字符串、数字等）
@@ -758,28 +811,7 @@ class ConfigUpdater:
         else:
             deep_default(new, 'Alas.DropRecord.AzurStatsID', random_id())
         # 更新到最新活动
-        server = to_server(deep_get(new, 'Alas.Emulator.PackageName', 'cn'))
-        if not is_template:
-            for task in EVENTS + RAIDS + COALITIONS:
-                opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
-                if opts and not deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') in opts:
-                    deep_set(new,
-                             keys=f'{task}.Campaign.Event',
-                             value=opts[0])
-
-            for task in GEMS_FARMINGS:
-                opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
-                if opts and deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') not in opts:
-                    deep_set(new,
-                             keys=f'{task}.Campaign.Event',
-                             value=opts[0])
-        # 作战档案不允许选择 campaign_main
-        for task in WAR_ARCHIVES:
-            opts = deep_get(self.args, keys=f'{task}.Campaign.Event.option_{server}', default=[])
-            if opts and deep_get(new, keys=f'{task}.Campaign.Event', default='campaign_main') == 'campaign_main':
-                deep_set(new,
-                         keys=f'{task}.Campaign.Event',
-                         value=opts[0])
+        refresh_campaign_events(new, self.args, is_template=is_template)
 
         # 活动不允许默认关卡 12-4
         def default_stage(t, stage):
@@ -824,6 +856,10 @@ class ConfigUpdater:
                     'General.YukikazeTaskManager.TaskPriorityAdjustment',
                     merge_task_priority(new_priority, template_priority, get_scheduler_tasks(self.args)),
                 )
+        if not is_template:
+            new, shop_warnings = migrate_shop_options(old, new)
+            for task, reason in shop_warnings:
+                logger.warning(f'{task}：{reason}，已暂停任务，请检查购买配置后重新启用')
         new = self._override(new)
 
         return new

@@ -17,6 +17,107 @@
 
 ## 2. 模块职责
 
+### 普通主线与活动的换船调度
+
+#### 等级、好感培养调度
+
+舰队管理的“换船调度”页面集中提供心情、等级和好感三个独立开关，默认关闭，复用“换船配置”的
+`FleetRotation.Rules`的实际舰队、勾选舰位和同号候补，不注册新的可执行任务。
+`FleetLevelTraining.Target`默认120、范围1–125；`FleetAffinityTraining.Target`默认100、
+范围1–200。三种调度共用`FleetInfo.FleetTraining.CheckIntervalHours`，以小时计，默认0.5，
+支持小数且不设上限，0表示每次结算检查。旧独立小时或分钟配置自动合并：优先取启用项目中的
+最短间隔；都关闭时取已有最短间隔，分钟先除以60。已有共用值优先，不清空培养记录。
+
+| 启用组合 | 完成条件与换船 |
+| --- | --- |
+| 仅等级 | 等级达标完成换船；心情不足只延时 |
+| 仅好感 | 好感达标完成换船；心情不足只延时 |
+| 仅心情 | 保留原临时轮换，不写培养完成 |
+| 心情＋等级 | 心情临时换船；等级达标才永久排除 |
+| 心情＋好感 | 心情临时换船；好感达标才永久排除 |
+| 等级＋好感 | 同一舰船两项全部达标才完成换船 |
+| 心情＋等级＋好感 | 心情临时换船；同舰两项全部达标才完成换船 |
+
+开始/换船后实读；结算边界检查间隔，到期仍先打完当前地图，在下一次出击前读取，不主动撤退。
+任务在边界停止时，剩余实读留到下次启动，不能用经过时间推断培养完成。共用间隔到期同步核对
+舰名、心情和全部启用条件，避免旧高好感和新等级拼成完成。仅心情也遵循同一读取计时。
+仅等级/好感时先用详情固定列确认舰位，再复用`prepare_rotation()`，从编队舰位4、1进入选船页
+实读舰名及心情，随后才读取角色培养数据；候补进入培养核对前也使用相同流程。
+“仅计算更换舰船心情”只控制等待和红脸的判断范围，不控制是否实读心情。
+间隔未到但心情策略切换或心情失效时仍校正心情，不提前触发等级/好感完成检查。
+
+`module/campaign/fleet_training.py`编排，`module/runtime/fleet_training.py`负责逐船条件和
+持久记录，`module/retire/fleet_training.py`复用大世界等级与经验识别及文本修正；培养经验解析失败保留未知，
+不改共享识别器的失败处理。经验随等级实读保存到`records.*.exp`，不参与培养完成判定；好感读取
+“当前”后的0–200数值。均要求新截图一致；同名歧义、Lua身份未确认、未知读数不记录完成。
+已由编队扫描确认的长舰名，其保留原文使用同一`ShipNameMatcher.approximate()`规则复核并核对规范名，
+不再因唯一截短名或已确认的相似拼写而拒绝保存整批读数；冲突规范名、歧义和待复核标记仍不能通过。
+只验证国服1280×720布局，不自动誓约、赠礼或觉醒。
+
+`FleetInfo.FleetTraining.State`独立保存`records`、读取中的`reading`和互换前落盘的
+`pending`。重启核对双方舰位的唯一身份，已交换则清除待确认项，未交换才续接；目标改变
+时取消尚未执行的旧计划。已完成记录保存当时目标，修改目标不自动撤销已经确认的完成状态。
+每次原有实读同时在记录中保存已确认的`fleet/slot`和已有`emotion`参考，仅用于页面展示；
+元信息保存只复用本次读取，不另行扫描、点击，完成判定不变。旧记录缺少这些字段时不推测补值，页面的六条历史上限不裁剪存储。
+同名舰船的可靠实读单独存入`State.readings["舰队:舰位"]`，保留当次舰名、等级、经验、好感及时间供页面展示，
+不合并进按舰名保存的`records`。尚未全部达标时可继续培养；全部达标但身份仍不唯一时明确提示同名原因，
+保留读数并延迟，不记录完成、不执行培养换船。识别数据缺失和舰名未确认仍按原保护停止。
+没有合适候补则按配置间隔延迟本任务（至少1分钟），不禁用调度器、不无限选船。
+
+临时心情换船保留逐船记录，候补须实读且未完成当前组合。换后继续由原
+`emotion.check_reduce()`判断能否出击，不能用等级/好感目标代替心情要求；仅计算更换舰船
+心情开关由三种调度共用；只有心情调度开启时才会临时换船。红脸和石油限制沿用已有路径。
+装备开启时仍先卸装、换船再补装。
+定向验证见`tests/test_fleet_training.py`，截图来源见`tests/fixtures/fleet_training/README.md`。
+
+`CampaignRun` 为单次出击实例安装 `preflight_rotation()` 回调，`CampaignBase.run()`
+在读取地图战斗次数之后、原有 `emotion.check_reduce()` 之前执行。开关及规则位于
+`FleetInfo.FleetRotation`，默认关闭，不注册执行任务或调度状态。仅 Main/Main2–5、
+Event/Event2/A–D 的普通主线/活动目录参与；还检查实际地图模式及活动困难关卡名，
+不会对困难编成、作战档案、低耗换船任务或大世界复用港区舰位。
+
+另有默认关闭的`FleetInfo.FleetEquipment.Enabled`，仅为上述智能换船联动装备码。
+开启后在候补和舰位确定后先统一卸装，全部互换完成再按角色详情的实际舰种清空并应用码，
+最后回母港继续原任务。同舰种按每队前后排的实际舰位顺序分别使用三个装备码，未换船的
+同舰种也计入顺序；未填写对应顺序位时保留换入舰船当前装备。卸装失败或换装失败保留独立
+待完成舰位，下次开启时先核对实际编队补完。关闭时不改变本节原有路径。流程、国服模板
+及配置约束见[退役与装备](game/retire-equipment.md#智能换船联动自动换装备)。
+
+策略按 `Fleet.Fleet1/Fleet2` 将出击角色映射到实际的1–6号舰队，使用本轮战斗数、
+出击顺序、双倍书和原有情绪控制线判断是否不足。零战斗的待命角色不换船。
+开启后，每次切换到受支持的刷图任务，先完成一次舰队扫描并校正实际心情；同一任务
+连续周回不重复这次入口扫描。Alas在派发任务时维护进程内的任务上下文，并把同一上下文
+交给CampaignRun；经过委托等其他任务再返回也会重扫。地图内的重启续接仍不插入扫描。
+
+账本心情不足时，`prepare_rotation()`只选择一次目标队，先从舰位4实测前排，取消后
+直接从同队舰位1实测后排，并停留在该选船页。实际心情充足只校正记录；
+未知读数不作为换船依据，仍走原出击检查。候补按整队最低心情降序、同值按队号升序，
+且必须拥有全部待换的同号舰位并满足出击心情要求。每轮只使用一支来源队，勾选4、5、6
+即调用4↔4、5↔5、6↔6，不从同排另选最高心情角色。
+`rotate_slot()`复用舰船信息的固定舰位与进程内卡面，直接从当前选船页点击来源角色，
+确认后只刷新这一排的所有已编队成员；下一舰位仍从目标队进入，不为采卡面切换来源队。
+一轮内保持等级降序，不重置排序，不逐艘往返主界面或采集详情。最后一次更新后的累计
+快照包含前后排及未换角色，直接用于双方最低心情，校正关联任务并返回原关卡，再执行
+正常的心情预检和入场。没有跳过原停止条件、原心情检查或战后扣减。
+
+重启后仍在地图内的续接路径不调用该出击前回调，保留已核实的地图恢复语义。
+互换执行或清理无法确认时抛出 `FleetManagementError`，不通过重启重复换船。
+
+培养换船始终检查勾选舰位的最低实测心情，固定舰船不足不能触发培养换船。
+`FleetRotation.SelectedOnly`默认关闭：关闭时，整队仍按任务原有控制线及单图消耗检查，
+固定舰船不足只延迟。开启后，培养舰位另用`RotationEmotion`保存会话内的恢复相位，
+按实际战斗及沉船惩罚扣减；培养换船要求沿用任务心情控制和单图消耗预留。
+整队仍记录全队最低心情供原界面及其他功能使用，但开启时等待和红脸确认只检查培养舰位，
+不额外设置全队出击下限；固定舰船低心情不阻塞出击。关闭时继续按全队原控制线等待，
+培养心情仍单独计算，固定低值不能触发培养换船。两种模式都不能用任务ignore设置绕过培养计算。
+候补在开启时只比较对应勾选舰位，关闭时保留整队排序。无合格候补则等待培养心情恢复，
+不会因整队出击下限较低而强行出击。心情轮换仅记录互换完成，不修改培养完成状态。
+切换任务、重启或规则/模式变化会实测重建；连续周回复用培养心情，避免固定低值反复扫描。
+石油、出击次数等其他停止/延迟条件保持原有顺序，不受此开关影响。
+旧待确认、旧策略及失败记录会自动清理，下一次先强制扫描实际编队；恢复轮次只换仍不足
+的勾选舰位，已恢复心情的舰位不重复互换。有效的运行中关闭进度仍可继续，无需手动清空。
+候补排序、部分完成记录及同名舰船限制见[退役与装备](game/retire-equipment.md)。
+
 ### 负责
 
 - 关卡名规范化：用户输入（`7-2`、`D3`、`TH1`）到地图文件名（`campaign_7_2`、`d3`）的转换，活动专属别名（`stage_name.py`）。
@@ -43,6 +144,7 @@
 ```
 module/campaign/
 ├── run.py               # CampaignRun：任务级多轮编排（选关、加载、停止条件）
+├── recovery.py          # CampaignRecovery：异常 Restart 凭据、预算和原海域导航
 ├── campaign_base.py     # CampaignBase：单次出击执行与战斗策略分发
 ├── campaign_ui.py       # CampaignUI：章节/模式导航、入口获取、活动 UI 适配
 ├── campaign_ocr.py      # CampaignOcr：关卡入口模板匹配 + 关卡名 OCR
@@ -118,6 +220,8 @@ OSMapOperation
 | `FleetSelectionMixin` | 低耗任务共用的船坞选船：普通稀有度 CV/DD 模板匹配、`ShipScanner` 等级/情绪/编队过滤、困难模式换用准备界面按钮 |
 | `OSCampaignRun` | 大世界任务入口：每个 `opsi_*` = 行动力溢出守卫 + 调用 `OperationSiren` 对应方法 + `ActionPointLimit` 延迟策略 |
 
+紧急委托和三油低耗共用 `GemsCampaignOverride.handle_exp_info()`。手动地图保留 C/D 经验页及沉船提示的点击兜底；自律寻敌的沉船提示交给 `handle_auto_search_shipwreck()`，必须保留公共战败确认、撤退状态与心情记账，不能只点掉提示后重新开启自律。`withdraw_stop` 的三次连续战败计数在同一战役实例中跨出击保留，正常战斗结束后重置；第三次战败退出关卡后抛出的专用 `ScriptEnd` 由 `CampaignRun._run()` 捕获并禁用当前任务。
+
 ### 地图文件的三方接口
 
 每个 `campaign/**/*.py` 必须提供三个模块级名字，`load_campaign()` 逐一消费：
@@ -177,6 +281,54 @@ flowchart TD
 
 `stage_name.py` 刻意做成不访问配置与文件系统的纯函数，便于离线单测；`T_CHAPTER_FOLDERS` 等「哪些活动接受 A1 作为 T1 别名」的清单以集合维护，新活动复用旧命名时在此登记。
 
+### 首发与复刻的选关布局
+
+活动地图目录可能同时用于首发和复刻。`event_20240912_cn` 在进入选关页后按实际按钮识别布局：左下角作战／剧情选择器走 `20241219` 侧边栏导航，普通／困难开关走旧导航；未知画面通过 `CampaignNameError` 回到选关循环重截图，不盲点模式按钮。布局标记仅覆盖当前战役配置副本，每次导航重新判断；普通和困难关卡在新版地图准备页切换难度，SP 不启用该难度开关。不要按服务器或单一当前活动全局替换导航逻辑。
+
+### 异常重启后续接原关卡
+
+`Campaign.ContinueAfterRestart`（「重启后继续战斗」）默认关闭，适用于使用公共 `CampaignRun` 入口的主线与活动海域，包括活动每日 A–D、每日 SP、紧急委托与三油低耗任务。资格按实际地图目录（`campaign_main`、`campaign_hard` 或 `event_*`）判断，不按任务名称白名单判断；突袭、共斗、伏击、作战档案与作战交接等不适用任务隐藏开关。必须同时启用周回与自律寻敌，并在异常前实际确认该图处于这两种模式。三战撤退、一次性地图和重写关键执行入口的自定义战役不生成续接凭据。关闭时继续保留启动遇到地图撤退、章节识别遇到撤退按钮回退的原有行为。
+
+调用链：调度器 `run()` 用 `campaign_recovery_scope()` 绑定当前任务 → 公共 `CampaignRun.run()` 捕获设备／客户端异常 → `CampaignRecovery.capture()` 保留原地图、运行器及出击参数 → 原异常分支安排 Restart → 实际登录成功后允许原任务恢复 → 沿已有 Page 图回到原关卡地图 → 确认自律 OFF 后开启，自律 ON 时直接接管 → 按普通 `auto_search_moving()`、`auto_search_combat()` 流程执行后续战斗。
+
+恢复入口只处理异常重启后返回地图这一场景，不接管重启前的战斗、加载或结算画面，也不把返回地图推断为旧战斗重试。尚未核实的游戏返回行为不能自行扩展为产品机制；若会影响正确性，应先向用户确认。
+
+活动每日恢复原地图后继续执行原任务编排，记录 `EventDaily.LastStage` 并执行后续关卡；每日 SP 保留单次出击与次日调度。紧急委托和三油低耗保留 `GemsEmotion` 与原换船编排，续接不执行启动时强制换旗舰；实际舰队心情不足时先撤退，再交回换船策略。
+
+凭据只保存在当前调度进程内，包含原任务、配置／设备签名、原地图代次与恢复次数。切换其他业务任务、配置或账本改变、超过有效期、worker 重启后均不续接。原图归属来自原运行器和异常恢复链，不能只凭任意地图画面断言归属；不支持人工换图或换号后沿用上下文。
+
+导航复用已有 `Page` 图，不重新选关或入图。登录若直接出现地图，交回原任务恢复自律；渠道服等待主界面的悬浮球检查留待后续任务。已回到选关页且没有原地图时，按普通流程执行，不补记通关次数。
+
+| 当前状态 | 处理 |
+| --- | --- |
+| 原地图，自律关闭 | 首次确认地图后至少等待两秒，期间持续截图；再确认 OFF 模板与颜色、当前实际舰队及心情后开启，进入加载／战斗则不点击 |
+| 原地图，自律开启 | 直接进入普通移动／战斗循环，不反向关闭开关 |
+| 原地图，先前已有战斗记录 | 不依据旧评级或阶段分流；清理旧场结果，后续每场正常计算心情 |
+| 已触发停止条件 | 从地图直接撤退并结束本次调用，不开启自律、不接管旧结算、不增加未完成周回计数 |
+| 无法确认原地图 | 回退原流程或沿用有界导航超时，不猜测战斗／结算状态 |
+
+`CampaignBase` 保留本地图已记录的 `battle_count`、周回次数与地图代次，不重新入图或重置地图进度。恢复前读取当前持久化心情，旧场 `CombatResult` 不跨重启继续使用。后续每场由普通战斗入口新建结果、确认进入战斗后正常扣基础心情；真实 A/B 或确定战败的额外消耗继续执行原有策略。不回滚重启前已经保存的消耗，也不让旧扣减标记免掉新出击的消耗。
+
+每个海域最多恢复三次，关联 Restart 也最多三次（包括登录失败）；导航与开启自律有短期限，设备卡死、过量点击及任务重启限制继续生效。只有正常进入新地图后才分配新的预算。
+
+离线验证入口：`uv run python -m unittest tests.test_campaign_restart_recovery tests.test_campaign_restart_tasks`。覆盖地图 OFF/ON、每场正常扣减、实际舰队识别、停止条件、普通战败、周回计数、每日／SP 及换船编排。四服资源组合与 Mock 回放不代表真实重启验收。
+
+限制：进程退出会丢失原地图上下文；未观察到的旧结果不补造，也不凭地图进度推断胜负或消耗。当前支持范围以已确认的重启返回地图行为为准。
+
+相关实现与配置索引：
+
+| 文件 | 用途 |
+| --- | --- |
+| [alas.py](../../alas.py)、[login.py](../../module/handler/login.py) | 异常来源、原任务凭据、Restart 预算与登录交接 |
+| [recovery.py](../../module/campaign/recovery.py)、[run.py](../../module/campaign/run.py)、[campaign_base.py](../../module/campaign/campaign_base.py) | 原地图保留、恢复导航和周回计数 |
+| [campaign_abcd.py](../../module/event/campaign_abcd.py)、[gems_farming.py](../../module/campaign/gems_farming.py)、[emotion.py](../../module/combat/emotion.py) | 每日关卡进度、紧急委托换船和实际舰队心情预检 |
+| [auto_search_combat.py](../../module/combat/auto_search_combat.py)、[combat.py](../../module/combat/combat.py)、[result.py](../../module/combat/result.py) | 普通战斗执行、严格开关检测与每场心情记录 |
+| [argument.yaml](../../module/config/argument/argument.yaml)、[override.yaml](../../module/config/argument/override.yaml) | 默认关闭的配置定义与不适用任务的隐藏覆盖 |
+| [args.json](../../module/config/argument/args.json)、[config_generated.py](../../module/config/config_generated.py)、[template.json](../../config/template.json) | 配置生成器维护的定义、Python 属性和模板 |
+| [zh-CN.json](../../module/config/i18n/zh-CN.json)、[en-US.json](../../module/config/i18n/en-US.json)、[ja-JP.json](../../module/config/i18n/ja-JP.json)、[zh-TW.json](../../module/config/i18n/zh-TW.json) | 四种语言的名称与限制说明 |
+| [test_campaign_restart_recovery.py](../../tests/test_campaign_restart_recovery.py)、[test_campaign_restart_tasks.py](../../tests/test_campaign_restart_tasks.py) | 隔离配置、恢复回放、跨任务编排及四服资源组合测试 |
+| 本文、[combat.md](combat.md)、[entry/alas.md](entry/alas.md) | 战役、战斗与调度的机制及验收边界 |
+
 ### 大世界入口聚合（os_run.py）
 
 `OSCampaignRun` 自身不实现任何游戏操作。每个 `opsi_*` 方法都是同一模板：
@@ -194,6 +346,8 @@ opsi_shop():
 ```
 
 关闭防溢出任务的原因：普通大世界任务运行时行动力会被消耗，防溢出任务此时插入调度没有意义且可能冲突；结束后按实际状态重新排程。个别方法有专属分支：`opsi_meowfficer_farming` 行动力不足时按「距重置是否不足一天」分流到次日或 2.5 小时；`opsi_scheduling` 须在 `os_init()` 前拦截（否则会先执行一次自律寻敌）；`opsi_month_boss` 在 TW 服直接停用。
+
+原调度的石油清理复用 `CampaignRun`：临时提高 `StopCondition_OilLimit`，实际战斗照常扣减运行次数和记录心情；达到清油目标时结束本次调用并移除临时覆盖，不添加日常低油等待。此时 `handle_commission_notice()` 暂缓委托红点跳转，任务切换检查采用清油临时优先级，防止委托在出击前反复抢占。系统恢复、用户停止、次数限制及真实心情冷却继续生效。候选仅包含已启用且到期的普通模式 Main/Main2/Main3/Event/Event2/Event3，不通过 `task_call()` 提前唤醒冷却任务；没有可运行的图时由调度器转后宅购粮。
 
 ## 7. 调用关系
 
@@ -280,6 +434,9 @@ stateDiagram-v2
 | `TaskBalancer.Enable` / `CoinLimit` / `TaskCall` | 混合 | false / 10000 / Main | 金币不足时切换到指定任务 |
 | `GemsFarming.*` | 混合 | — | 换旗舰/先锋、普通船筛选、装备码、情绪策略、先锋等级区间 |
 | `Emotion.Mode` / `Fleet1Value` 等 | 混合 | — | 心情计算模式与各舰队心情记录 |
+| `Hard.RunAt18` | bool | `false` | 困难图改为服务器时间 18:00 运行；关闭时沿用零点调度 |
+
+开启 `Hard.RunAt18` 后，若困难图在服务器时间 18:00 前被调起，只将任务延后到当天 18:00，不进入困难关卡；18:00 后到期则正常执行剩余次数，完成后安排到下一次 18:00。旧配置自动补齐为关闭，保留原有零点调度。
 
 关键关联：`GemsFarming`/`ThreeOilLowCost` 共用同一组 `GemsFarming.*` 参数；`StopCondition_MapAchievement` 与 `can_use_auto_search_continue()` 联动（非 `non_stop` 时禁用续战，因为自动搜索菜单里读不到地图信息）；活动类配置 `MAP_CHAPTER_SWITCH_*`、`STAGE_ENTRANCE` 由地图文件 `Config` 注入而非用户设置。
 
@@ -298,7 +455,7 @@ stateDiagram-v2
 | `ActionPointLimit` | 大世界行动力不足 | 各 `opsi_*` 捕获后按任务语义延迟（次日刷新 / 定长分钟） |
 | `TaskEnd` | `task_stop()` 抛出 | 上层调度器捕获，属正常任务切换 |
 
-自动恢复与终止的边界：情绪 bug（客户端长时间运行心情计算错误）触发 `task_call('Restart')` 重启游戏而非停止任务；委托通知则调用 `task_call('Commission')` 后停止当前任务。设备层的 `GameStuckError` / `GameTooManyClickError` 由 `module/device` 统一恢复，本模块不吞异常。
+自动恢复与终止的边界：心情不足按恢复时间等待或延后任务；纯计算模式遇到红脸时，取消出击、退出关卡并从 0 建立有效恢复状态，满足下次出击需求后自动重试。累计心情扣减不触发客户端重启。委托通知调用 `task_call('Commission')` 后停止当前任务；`GameStuckError` / `GameTooManyClickError` 等实际异常仍交给上层恢复，本模块不吞异常。
 
 ## 12. 并发与线程模型
 
@@ -311,6 +468,7 @@ stateDiagram-v2
 
 ## 13. 缓存与持久化
 
+- 地图加载缓存以活动目录与关卡文件名共同判断；两个活动都有 `a1` 时必须重新加载各自地图，只有目录和文件名都相同才复用。
 - `stage_entrance` 字典：每次 `_get_stage_name()` 整体重建，不跨截图缓存；`_stage_image` / `_stage_image_gray` 是 `cached_property`，OCR 前后用 `del_cached_property` 显式失效。
 - `_map_battle`（Boss 前战斗数）为 `cached_property`，随每次 `load_campaign` 新建的 campaign 实例自然失效。
 - 用户配置中的持久化状态：`EventDaily_LastStage`（活动日常断点续刷）、`WarArchives_DailyRunCountRemain/Record`（档案每日额度，跨天按服务器刷新时间重置）、`Emotion.Fleet1Value` 等心情记录、`Dashboard.*`（`LogRes` 写入的油/金币/PT 快照）。
@@ -319,7 +477,7 @@ stateDiagram-v2
 ## 14. 生命周期
 
 1. **创建**：`alas.py` 任务方法构造 `CampaignRun(config, device)`，全部能力经继承链就位，无单独初始化。
-2. **加载**：`load_campaign()` 若关卡名未变则直接复用；否则 `importlib.import_module` 加载地图模块（进程内缓存），深拷贝配置合并地图 `Config`，实例化 `module.Campaign`。GemsFarming/Ambush11 在此步骤动态构造覆写子类替换实例。
+2. **加载**：`load_campaign()` 若目录和关卡名均未变则直接复用；否则 `importlib.import_module` 加载地图模块（进程内缓存），深拷贝配置合并地图 `Config`，实例化 `module.Campaign`。GemsFarming/Ambush11 在此步骤动态构造覆写子类替换实例。
 3. **运行**：`run()` 的多轮循环；每轮先做 UI 状态恢复，再出击，再判停止条件。地图模块类对象进程内缓存，实例随关卡切换重建。
 4. **收尾**：`ensure_auto_search_exit()` 保证退出自动搜索菜单后任务结束；`config.update()` 把仪表盘与计数写回；实例整体丢弃，无显式销毁。
 
@@ -329,11 +487,21 @@ stateDiagram-v2
 
 1. **复制相近活动**：从结构最接近的 `event_*` 目录复制，逐关修改 `MAP` 网格/权重/刷新表、`Config` 机制开关、`Campaign` 策略函数；活动级共享调整放该目录的 `campaign_base.py`。
 2. **登记 Readme.md**：在 `campaign/Readme.md` 表格加一行（Aired Date | Directory | Event Name | CN/EN/JP/TW），复用旧地图的活动也必须登记（目录名可与首播日期不同）。
-3. **生成配置**：运行 `uv run -m module.config.config_updater`，为 `Campaign.Event` 生成各服务器选项与 i18n 键，随后补齐 `zh-CN`/`zh-MIAO`/`en-US`/`ja-JP`/`zh-TW` 翻译。
+3. **生成配置**：运行 `uv run -m module.config.config_updater`，为 `Campaign.Event` 生成各服务器选项与 i18n 键，随后补齐 `zh-CN`/`en-US`/`ja-JP`/`zh-TW` 翻译。
 4. **资源**：活动专属按钮/PT 图标经 `uv run -m dev_tools.button_extract` 提取进 `assets/{server}/campaign/`。
 5. **特殊 UI**（按需）：新章节侧边栏布局在 `campaign_ui.py` 加 `ASIDE_SWITCH_YYYYMMDD` 与 `campaign_set_chapter_*` 分支；新关卡名别名（如 `vsp`→`sp`）加进 `stage_name.py` 的别名字典；无「威胁：安全」指示器的活动在 `_apply_event_achievement_fallback` 处理。
 
 新增一类**任务**（而非活动）时：继承 `CampaignRun`（需要棋盘执行再加 `CampaignBase`），覆写 `run()` 或 `triggered_stop_condition()`，在 `alas.py` 加同名方法并在 `module/config/argument/` 登记任务与参数。
+
+### 飓风与雾霭回廊（20261022）
+
+- 国服、国际服和日服共用 `campaign/event_20261022_cn/` 的 T1–T6 与 SP，地图、机制配置和战斗策略采用 Lme 上游实现。EX 不在自动刷图范围内。
+- T1–T3 属于上篇、T4–T6 属于下篇，SP 使用独立分区。活动基类沿用 `page_sp` 和 20241219 四分区导航；关卡没有普通／困难模式切换。`stage_name.py` 保留 T 关名，并支持与同类活动一致的 A/SP 数字别名及 A/B 日常关卡转换。
+- 活动剧情工具同样使用 `page_sp` 作为本期活动入口，到达后通过左下角模式开关进入剧情模式；上下篇作战页和剧情页共用 `S.P.` 页面标识。
+- T 关启用移动精英与舰队步数限制，精英移动回合为 `(2,)`，通过 `MAP_SIREN_HAS_BOSS_ICON_SMALL` 识别小型橙色图标。SP 关闭移动精英和舰队步数限制，通过 `MAP_SIREN_TEMPLATE = ['TempestaGhostBoss02']` 引用上游 GIF 模板，精英位置由通用地图识别流程确认。
+- 活动名称以 `campaign/Readme.md` 登记表为准，英文为 “Tempesta and the Corridor of Fog”；配置生成器同步各服活动候选和五种语言的名称。
+- `war_archives_20241024_cn`（飓风与沉眠之海）和 `war_archives_20251023_cn`（飓风与自由群岛）各提供 T1–T6，并通过作战档案模板字典登记。两组地图同样接入 `stage_name.py` 的 T 关别名规则；A1–A6、SP1–SP6 和日常 A/B 名称可转换到对应 T 关。
+- 地图、波次、配置和导航可离线核对；上游滑动参数与新海面背景的识别仍需本期 1280×720 截图或经授权的模拟器验收，离线检查不代表实机通过。
 
 ## 16. 修改注意事项
 
@@ -418,3 +586,6 @@ CampaignRun(config=self.config, device=self.device).run(
 - [配置系统](config.md) —— `override`、`cross_set`、`task_delay`/`task_call` 的语义
 - [处理器层](handler.md) —— 快进/成就判定（`FastForwardHandler`）、自动搜索菜单处理
 - [OCR 系统](ocr.md) —— `Ocr`/`Digit` 底层与 `PtOcr` 预处理
+### 末轮资源归因
+
+战役正常结束或安全切换后，仅在正向确认的选图页连续两帧核对石油、物资及可见活动 PT，仍处于原任务的记账范围。达到次数上限的最后一轮耗油也因此归给实际刷图任务，已记录的奖励在库存差额中扣除。此核对不导航、不增加战斗、不修改停止或心情条件；游戏异常直接走原恢复机制。记录依据和无法归因的变化见 [资源管理](webui/resource-management.md)。

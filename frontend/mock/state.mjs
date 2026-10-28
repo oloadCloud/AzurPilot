@@ -3,143 +3,29 @@ import { createHash } from 'node:crypto'
 import Ajv from 'ajv'
 import {spawnSync} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
+import {createStockProxy} from './stock.mjs'
+import {resourceFlows} from './resource-flows.mjs'
 
 // 只读取公开的模板、元数据和翻译，绝不读取用户实例或部署文件。
 const read = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const args = read('../../module/config/argument/args.json')
 const menu = read('../../module/config/argument/menu.json')
 const template = read('../../config/template.json')
+const storageCatalog = read('../../assets/stats/storage_items/catalog.json')
 const contract = read('../src/api/contract.json')
-const locales = Object.fromEntries(['zh-CN', 'zh-TW', 'en-US', 'ja-JP', 'zh-MIAO'].map(lang => [lang, read(`../../module/config/i18n/${lang}.json`)]))
+const locales = Object.fromEntries(['zh-CN', 'zh-TW', 'en-US', 'ja-JP'].map(lang => [lang, read(`../../module/config/i18n/${lang}.json`)]))
 const ajv = new Ajv({ strict: false, useDefaults: true })
 const validators = Object.fromEntries(Object.entries(contract.methods).map(([method, entry]) => [method, ajv.compile(entry.params)]))
 const revision = values => createHash('sha256').update(JSON.stringify(values)).digest('hex')
+// 与后端按游戏包名确定地区的规则一致，开服检测配置不参与判断。
+const region = packageName => !packageName || packageName === 'auto' ? null : ({
+  en: 'en', jp: 'jp', tw: 'tw',
+  'com.YoStarEN.AzurLane': 'en', 'com.YoStarJP.AzurLane': 'jp', 'com.hkmanjuu.azurlane.gp': 'tw',
+  'com.hkmanjuu.azurlane.gp.mc': 'tw',
+})[packageName] ?? 'cn'
 const timestamp = date => date.toISOString().slice(0, 19).replace('T', ' ')
 const translate = key => key.split('.').reduce((value, part) => value?.[part], locales['zh-CN']) ?? key
 export const fail = (code, message, details = null) => { throw Object.assign(new Error(message), { code, details }) }
-
-function strategyLocation(source, index) {
-  const prefix = source.slice(0, Math.max(0, index))
-  return { line: prefix.split(/\r?\n/).length, column: prefix.length - Math.max(prefix.lastIndexOf('\n'), prefix.lastIndexOf('\r')) }
-}
-
-function invalidStrategy(source, code, message, index = 0) {
-  return { valid: false, diagnostics: [{ code, message, ...strategyLocation(source, index) }] }
-}
-
-function maskLuaStringsAndComments(source) {
-  let output = ''
-  for (let index = 0; index < source.length;) {
-    if (source.startsWith('--[[', index)) {
-      const end = source.indexOf(']]', index + 4)
-      if (end < 0) return { masked: output, error: invalidStrategy(source, 'syntax_error', '多行注释没有结束', index) }
-      const comment = source.slice(index, end + 2)
-      output += comment.replace(/[^\r\n]/g, ' ')
-      index = end + 2
-      continue
-    }
-    if (source.startsWith('--', index)) {
-      const end = source.indexOf('\n', index)
-      const comment = source.slice(index, end < 0 ? source.length : end)
-      output += comment.replace(/[^\r\n]/g, ' ')
-      index = end < 0 ? source.length : end
-      continue
-    }
-    const quote = source[index]
-    if (quote === '"' || quote === "'") {
-      const start = index++
-      output += ' '
-      let closed = false
-      while (index < source.length) {
-        const char = source[index++]
-        if (char === '\\') {
-          output += ' '
-          if (index < source.length) output += source[index++] === '\n' ? '\n' : ' '
-          continue
-        }
-        output += char === '\n' || char === '\r' ? char : ' '
-        if (char === quote) { closed = true; break }
-      }
-      if (!closed) return { masked: output, error: invalidStrategy(source, 'syntax_error', '字符串没有结束', start) }
-      continue
-    }
-    output += source[index++]
-  }
-  return { masked: output, error: null }
-}
-
-function validateMockStrategy(script) {
-  // Mock 不执行 Lua；这里只复现不会误伤有效分支策略的明显语法和白名单错误。
-  if (!script.trim()) return { valid: true, diagnostics: [] }
-  const { masked, error } = maskLuaStringsAndComments(script)
-  if (error) return error
-
-  const pairs = { '(': ')', '[': ']', '{': '}' }
-  const opening = []
-  for (let index = 0; index < masked.length; index++) {
-    const character = masked[index]
-    if (character in pairs) opening.push({ character, index })
-    else if (Object.values(pairs).includes(character)) {
-      const previous = opening.pop()
-      if (!previous || pairs[previous.character] !== character) return invalidStrategy(script, 'syntax_error', '括号或花括号不匹配', index)
-    }
-  }
-  if (opening.length) return invalidStrategy(script, 'syntax_error', '括号或花括号没有结束', opening.at(-1).index)
-
-  const forbiddenStatement = /\b(?:while|repeat|for|goto|break)\b/.exec(masked)
-  if (forbiddenStatement) return invalidStrategy(script, 'forbidden_statement', `不支持 ${forbiddenStatement[0]} 语句`, forbiddenStatement.index)
-  const namedFunction = /\bfunction\s+(?!\()/.exec(masked)
-  if (namedFunction) return invalidStrategy(script, 'forbidden_statement', '不支持具名 function 语句', namedFunction.index)
-  const forbiddenCall = /\b((?:os|io|debug|package|math|string|table|coroutine)\s*[.:]\s*[A-Za-z_]\w*|require|load|dofile|loadfile|collectgarbage|setmetatable|getmetatable|pairs|ipairs|next|type|tonumber|tostring|error|assert|pcall|xpcall)\s*\(/.exec(masked)
-  if (forbiddenCall) {
-    return invalidStrategy(script, 'forbidden_call', `不允许调用 ${forbiddenCall[1].replace(/\s/g, '')}`, forbiddenCall.index)
-  }
-  const plan = /\breturn\s+shop\s*\.\s*plan\s*(?:\(\s*)?\{/.exec(masked)
-  if (!plan) return invalidStrategy(script, 'missing_return', '必须返回 shop.plan {...}', 0)
-
-  const unknownShopField = /\bshop\s*\.\s*(?!plan\b)([A-Za-z_]\w*)/.exec(masked)
-  if (unknownShopField) return invalidStrategy(script, 'forbidden_field', `不支持 shop.${unknownShopField[1]}`, unknownShopField.index)
-  const allowedContextFields = new Set(['domain', 'currency', 'spent', 'purchased'])
-  for (const match of masked.matchAll(/\bcontext\s*\.\s*([A-Za-z_]\w*)/g)) {
-    if (!allowedContextFields.has(match[1])) return invalidStrategy(script, 'unknown_context_field', `不支持 context.${match[1]}`, match.index)
-  }
-  const allowedCandidateFields = new Set(['id', 'key', 'name', 'group', 'sub_genre', 'tier', 'price', 'cost', 'stock', 'max_quantity', 'available'])
-  for (const match of masked.matchAll(/\bitem\s*\.\s*([A-Za-z_]\w*)/g)) {
-    if (!allowedCandidateFields.has(match[1])) return invalidStrategy(script, 'unknown_candidate_field', `不支持商品字段 ${match[1]}`, match.index)
-  }
-  const allowedPipelineMethods = new Set(['where', 'score', 'order_by', 'cap', 'take'])
-  for (const match of masked.matchAll(/:\s*([A-Za-z_]\w*)\s*\(/g)) {
-    const method = match[1]
-    if (!allowedPipelineMethods.has(method)) return invalidStrategy(script, 'forbidden_call', '候选管道只允许 where、score、order_by、cap、take', match.index)
-  }
-  for (const match of masked.matchAll(/:\s*take\s*\(([^)]*)\)/g)) {
-    const rawAmount = match[1].trim()
-    if (!/^\d+$/.test(rawAmount)) return invalidStrategy(script, 'invalid_take', 'take 必须是 0 到 100 之间的整数', match.index)
-    const amount = Number(rawAmount)
-    if (amount > 100) return invalidStrategy(script, 'invalid_take', 'take 必须在 0 到 100 之间', match.index)
-  }
-  for (const match of masked.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)) {
-    const before = masked.slice(0, match.index).trimEnd().at(-1)
-    if (before === ':' || before === '.' || ['function', 'if', 'elseif'].includes(match[1])) continue
-    return invalidStrategy(script, 'forbidden_call', `不允许调用 ${match[1]}`, match.index)
-  }
-  return { valid: true, diagnostics: [] }
-}
-
-function requireValidMockStrategy(script) {
-  const result = validateMockStrategy(script)
-  if (!result.valid) fail('INVALID_PARAMS', `高级商店策略脚本无效：${result.diagnostics[0].message}`, result.diagnostics)
-}
-
-function validateMockAdvancedGroups(values, tasks) {
-  for (const task of tasks) {
-    const group = values[task]?.ShopAdvanced
-    if (group?.Mode !== 'advanced') continue
-    const script = group.Script
-    if (typeof script !== 'string' || !script.trim()) fail('INVALID_PARAMS', `${task} 的高级模式需要先保存非空且有效的策略脚本`)
-    requireValidMockStrategy(script)
-  }
-}
 
 function validateField(path, value) {
   const parts = path.split('.')
@@ -154,7 +40,7 @@ function validateField(path, value) {
   if (field.option?.length && !field.option.includes(value)) fail('INVALID_PARAMS', '请选择有效选项')
   const kind = typeof field.value
   const valid = field.type === 'checkbox' || kind === 'boolean' ? typeof value === 'boolean'
-    : kind === 'number' ? typeof value === 'number' && Number.isFinite(value) && (!Number.isInteger(field.value) || Number.isInteger(value))
+    : kind === 'number' ? typeof value === 'number' && Number.isFinite(value) && (field.valuetype === 'float' || !Number.isInteger(field.value) || Number.isInteger(value))
       : typeof value === 'string' || (field.value === null && value === null)
   if (!valid || (typeof value === 'string' && value.length > 20000)) fail('INVALID_PARAMS', '参数类型或长度不正确')
   if (Array.isArray(field.validate) && (typeof value !== 'number' || value < field.validate[0] || value > field.validate[1])) fail('INVALID_PARAMS', '数值超出允许范围')
@@ -164,7 +50,44 @@ function validateField(path, value) {
 
 export function createMockState({ empty = false } = {}) {
   const instances = new Map()
+  const fleetStates = new Map()
+  function fleetStatePython(action, params) {
+    const output = mindPython(action, {...params, state: fleetStates.get(params.instance),
+      config: get(params.instance).values})
+    if (['tech.patch', 'tech.mergeShips', 'dock.patch', 'dock.review', 'dock.importLegacy', 'dock.stageImport'].includes(action)) fleetStates.set(params.instance, output.state)
+    if (action === 'dock.importLegacy') get(params.instance).values = output.config
+    return output.result
+  }
+  const fleetPython = (action, params) => fleetStatePython(`tech.${action}`, params)
+  function mindPython(action, params) {
+    const run = spawnSync('uv', ['run', '--no-sync', 'python', '-X', 'utf8', '-m', 'dev_tools.mind_calculator_mock'], {
+      cwd: fileURLToPath(new URL('../../', import.meta.url)), input: JSON.stringify({action, ...params}),
+      encoding: 'utf8', timeout: 30000, maxBuffer: 32 * 1024 * 1024, windowsHide: true,
+    })
+    if (run.error || run.status) fail('INTERNAL_ERROR', '计算器模拟服务运行失败')
+    const result = JSON.parse(run.stdout)
+    if (result.error) fail(result.code ?? 'INVALID_PARAMS', result.error)
+    return result
+  }
+  const stock = createStockProxy(name=>{const r=get(name).values.Dashboard.ActionPoint;return r?.Total!=null&&r.Record?{instance:name,actionPoints:r.Total,observedAt:Math.floor(new Date(r.Record.replace(' ','T')+'Z').getTime()/1000)}:null})
   const programs = new Map()
+  const simulations = new Map()
+  function simulation(name) {
+    if (!simulations.has(name)) simulations.set(name, {
+      state: 'idle', running: false, runId: 0, completedSamples: 0, totalSamples: 0,
+      error: '', result: null, figure: null, image: null, entries: [], cursor: 0, floor: 0,
+    })
+    return simulations.get(name)
+  }
+  function simulationLog(item, text) {
+    item.entries.push({id: ++item.cursor, level: 'INFO', text: `INFO ${timestamp(new Date())} │ [大世界模拟器] ${text}`})
+  }
+  function simulationStatus(name, after = 0) {
+    const {image, entries, cursor, floor, ...status} = simulation(name)
+    const reset = after <= floor || after > cursor
+    return structuredClone({...status, instance: name,
+      logs: {instance: name, cursor, reset, entries: entries.filter(entry => reset || entry.id > after)}})
+  }
   let cardCatalog
   function programPython(action, config, params = {}) {
     const run = spawnSync('uv', ['run', '--no-sync', 'python', '-X', 'utf8', '-m', 'dev_tools.scheduler_mock'], {
@@ -199,6 +122,13 @@ export function createMockState({ empty = false } = {}) {
     localHead = divergedUpdater ? divergedLocalHead : commits[3].sha
   }
   const updateStatus = () => ({ state: localHead === upstreamHead ? 'idle' : 'available', localHead, upstreamHead, branch: 'dev', ahead: divergedUpdater ? 1 : 0, behind: divergedUpdater ? 3 : commits.findIndex(item => item.sha === localHead), available: localHead !== upstreamHead, busy: false, canApply: localHead !== upstreamHead, canCancel: false, error: '', shaMismatch: divergedUpdater })
+  let mockClients = [
+    { id: '11112222333344445555666677778888', created_at: 1729214415 },
+    { id: 'aaaabbbbccccddddeeeeffff00001111', created_at: 1729214533 },
+    { id: '22223333444455556666777788889999', created_at: 1729214650 },
+    { id: 'bbbbccccddddeeeeffff000011112222', created_at: 1729214780 },
+    { id: '3333444455556666777788889999aaaa', created_at: 1729214910 },
+  ]
   const settings = {
     groups: [
       {
@@ -220,11 +150,32 @@ export function createMockState({ empty = false } = {}) {
         ]
       },
     ], notice: '前端测试数据', demo: false, remote: {
-      enabled: true, state: 'waiting_peer', address: 'https://tunnel.example.com/p2p/example-peer-id', error: '',
+      enabled: true, state: 'cloudflare_ready', address: 'https://remote.azurpilot.com/d/mock-device-id/', error: '',
     }
   }
   const get = name => instances.get(name) ?? fail('NOT_FOUND', '实例不存在')
-  const snapshot = name => ({ instance: name, revision: revision(get(name).values), values: structuredClone(get(name).values) })
+  const campaignOptions = values => {
+    const server = region(values.Alas.Emulator.PackageName) ?? 'cn'
+    return Object.fromEntries(Object.entries(args).flatMap(([task, groups]) => {
+      const candidates = groups.Campaign?.Event?.[`option_${server}`]
+      return candidates ? [[`${task}.Campaign.Event`, candidates]] : []
+    }))
+  }
+  const refreshCampaigns = (values, options) => {
+    for (const [path, candidates] of Object.entries(options)) {
+      const [task] = path.split('.')
+      const current = values[task]?.Campaign?.Event ?? 'campaign_main'
+      if (candidates.length && (task !== 'WarArchives' || current === 'campaign_main') && !candidates.includes(current)) {
+        values[task].Campaign.Event = candidates[0]
+      }
+    }
+  }
+  const snapshot = name => {
+    const values = structuredClone(get(name).values)
+    const options = campaignOptions(values)
+    refreshCampaigns(values, options)
+    return { instance: name, revision: revision(get(name).values), values, options }
+  }
   // 日志时间与真实后端一致使用本地时区（timestamp() 供调度比较，保持 UTC）。
   const logTime = date => [date.getHours(), date.getMinutes(), date.getSeconds()].map(n => String(n).padStart(2, '0')).join(':')
     + '.' + String(date.getMilliseconds()).padStart(3, '0')
@@ -475,6 +426,7 @@ export function createMockState({ empty = false } = {}) {
       values.Main.Emotion.Fleet1Record = '2026-09-12 23:45:12.123456'
       values.Main.Scheduler.NextRun = '2099-01-01 12:00:00'
       values.Alas.Emulator.Serial = `127.0.0.1:${5555 + index * 2}`
+      values.Alas.Emulator.ServerName = 'cn_android-20'
       /* 四个演示实例各占一档：小狗 / 中狗 / 大狗 / 狗王，用来一次看全行动力图标的四档。 */
       const apTotal = {'demo-main': 6001, 'demo-alt': 8001, 'demo-error': 10001, 'demo-dog': 12001}[name] ?? 6001
       const dashboardDefaults = {
@@ -521,9 +473,11 @@ export function createMockState({ empty = false } = {}) {
     }
   }
   function dispatch(method, input = {}) {
-    const params = structuredClone(input)
+    let params = structuredClone(input)
     if (!Object.hasOwn(validators, method)) fail('METHOD_NOT_FOUND', '未知 API 方法')
     if (!validators[method](params)) fail('INVALID_PARAMS', '请求参数不符合 API 契约')
+    // Optional ledger fields carry presence semantics, matching Pydantic exclude_unset.
+    if (['dock.patch', 'dock.review', 'dock.stageImport', 'fleetTech.patch', 'mind.plan'].includes(method)) params = structuredClone(input)
     const name = params.instance
     if (name != null) get(name)
     switch (method) {
@@ -534,7 +488,7 @@ export function createMockState({ empty = false } = {}) {
       case 'updater.cancel': return { accepted: true }
       case 'system.ping': return { pong: true }
       case 'schema.get': return { args, menu, translations: locales[params.language] }
-      case 'instances.list': return [...instances].map(([name, item]) => ({ name, status: item.status, currentTask: item.status === 'running' ? 'Commission' : null, serial: item.values.Alas.Emulator.Serial, server: item.values.Alas.Emulator.ServerName }))
+      case 'instances.list': return [...instances].map(([name, item]) => ({ name, status: item.status, currentTask: item.status === 'running' ? item.currentTask ?? 'Commission' : null, serial: item.values.Alas.Emulator.Serial, server: item.values.Alas.Emulator.ServerName, region: region(item.values.Alas.Emulator.PackageName) }))
       case 'instances.create': {
         if (!/^[A-Za-z0-9\u3041-\u3096\u30a1-\u30fa\u30fc\u31f0-\u31ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff][A-Za-z0-9_. \u3041-\u3096\u30a1-\u30fa\u30fc\u31f0-\u31ff\uff66-\uff9f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\-]{0,63}$/.test(params.name) || /^(template|deploy|backup|con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(params.name)) fail('INVALID_PARAMS', '实例名称无效')
         if ([...instances.keys()].some(name => name.toLowerCase() === params.name.toLowerCase())) fail('ALREADY_EXISTS', '同名实例已存在')
@@ -544,8 +498,9 @@ export function createMockState({ empty = false } = {}) {
       }
       case 'instances.delete':
         if (get(name).status === 'running') fail('INSTANCE_RUNNING', '请先停止实例再删除')
+        if (simulations.get(name)?.running) fail('SIMULATOR_RUNNING', '请先中断大世界模拟器再删除实例')
         if (params.revision !== snapshot(name).revision) fail('CONFLICT', '配置已变化，请重新加载后删除')
-        instances.delete(name); startup.delete(name); programs.delete(name)
+        instances.delete(name); startup.delete(name); programs.delete(name); simulations.delete(name); fleetStates.delete(name)
         return { deleted: name }
       case 'config.get': return snapshot(name)
       case 'config.export': {
@@ -576,31 +531,53 @@ export function createMockState({ empty = false } = {}) {
         programs.set(name, current); return program(name)
       }
       case 'scheduler.program.state': return {mode:program(name).mode, generation:program(name).generation, state:{status:'idle',trace:[]}}
-      case 'shop_strategy.validate': return validateMockStrategy(params.script)
       case 'config.patch': {
         const data = snapshot(name)
         const seen = new Set()
-        const affectedShopTasks = new Set()
         for (const { path, value } of params.changes) {
           const [task, group, arg] = validateField(path, value)
           if (seen.has(path)) fail('INVALID_PARAMS', '同一次保存不能重复修改同一个参数')
           seen.add(path)
-          const field = args[task][group][arg]
-          if (field.mode === 'restricted_lua') requireValidMockStrategy(value)
           data.values[task] ??= {}; data.values[task][group] ??= {}
           data.values[task][group][arg] = value
-          if (group === 'ShopAdvanced') affectedShopTasks.add(task)
         }
-        validateMockAdvancedGroups(data.values, affectedShopTasks)
+        const options = campaignOptions(data.values)
+        for (const [path, candidates] of Object.entries(options)) {
+          const [task] = path.split('.')
+          if (candidates.length && seen.has(path) && !candidates.includes(data.values[task].Campaign.Event)) fail('INVALID_PARAMS', '请选择当前服务器的活动')
+        }
+        refreshCampaigns(data.values, options)
         get(name).values = data.values
         log(name, `已保存 ${params.changes.length} 项配置。`)
         return snapshot(name)
       }
       case 'overview.get': return overview(name)
+      case 'dock.configure': {
+        if (params.min_level > params.max_level) fail('INVALID_PARAMS', '最低等级不能大于最高等级')
+        if (get(name).status === 'running') fail('INSTANCE_RUNNING', '实例运行中')
+        Object.assign(get(name).values.DockScan.Dock, {MinLevel: params.min_level, MaxLevel: params.max_level})
+        return dispatch('dock.report', {instance: name})
+      }
+      case 'dock.report': return fleetStatePython('dock.report', params)
+      case 'dock.importLegacy': return fleetStatePython('dock.importLegacy', params)
+      case 'dock.patch': return fleetStatePython('dock.patch', params)
+      case 'dock.review': return fleetStatePython('dock.review', params)
+      case 'dock.stageImport': return fleetStatePython('dock.stageImport', params)
+      case 'mind.catalog': return mindPython('catalog', params)
+      case 'fleetTech.catalog': return fleetPython('catalog', params)
+      case 'fleetTech.report': return fleetPython('report', params)
+      case 'fleetTech.patch': return fleetPython('patch', params)
+      case 'fleetTech.mergeShips': return fleetPython('mergeShips', params)
+      case 'mind.plan': return fleetStatePython('mind.plan', params)
+      case 'mind.import': return mindPython('import', params)
+      case 'mind.recognize': return mindPython('recognize', params)
+      case 'stock.status': return stock.status(name)
+      case 'stock.rebuild': return stock.rebuild(name,params)
+      case 'stock.request': return stock.request(name,params)
       case 'scheduler.start': case 'tasks.run':
         if (get(name).status === 'running') fail('INSTANCE_RUNNING', '实例已在运行')
-        if (method === 'tasks.run' && params.task !== 'FleetScan' && !Object.values(menu).some(group => group.page === 'tool' && group.tasks.includes(params.task))) fail('INVALID_PARAMS', '该任务不支持单独运行')
-        get(name).status = 'running'; log(name, '模拟调度器已启动。')
+        if (method === 'tasks.run' && !['FleetScan', 'StorageStatistics', 'DockScan'].includes(params.task) && !Object.values(menu).some(group => group.page === 'tool' && group.tasks.includes(params.task))) fail('INVALID_PARAMS', '该任务不支持单独运行')
+        get(name).status = 'running'; get(name).currentTask = params.task ?? 'Commission'; log(name, '模拟调度器已启动。')
         return overview(name)
       case 'scheduler.stop':
         get(name).status = 'stopped'; log(name, '模拟调度器已停止。')
@@ -610,6 +587,26 @@ export function createMockState({ empty = false } = {}) {
         const reset = params.after > item.cursor || params.after < (item.logs[0]?.id ?? 1) - 1
         return { instance: name, cursor: item.cursor, reset, entries: item.logs.filter(entry => reset || entry.id > params.after) }
       }
+      case 'opsi.simulator.status': return simulationStatus(name, params.after)
+      case 'opsi.simulator.start': {
+        const item = simulation(name)
+        if (item.running) fail('SIMULATOR_RUNNING', '模拟正在进行，请先中断或等待完成')
+        const settings = get(name).values.OpsiSimulator.OpsiSimulatorParameters
+        Object.assign(item, {state: 'running', running: true, runId: item.runId + 1,
+          completedSamples: 0, totalSamples: settings.Deterministic ? 1 : settings.Samples,
+          error: '', result: null, figure: null, image: null, entries: [], floor: item.cursor})
+        simulationLog(item, '模拟服务示例已启动。')
+        return simulationStatus(name)
+      }
+      case 'opsi.simulator.stop': {
+        const item = simulation(name)
+        if (item.running) {
+          item.state = 'interrupted'; item.running = false
+          simulationLog(item, '模拟中断。')
+        }
+        return simulationStatus(name)
+      }
+      case 'opsi.simulator.figure': return {instance: name, image: simulation(name).image}
       case 'preview.capture': {
         if (!get(name).previewAt) return { instance: name, image: null, capturedAt: null }
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#142d3a"/><circle cx="640" cy="300" r="145" fill="none" stroke="#78dac4" stroke-width="3"/><path d="M640 190 720 370 640 330 560 370Z" fill="#78dac4"/><text x="640" y="530" text-anchor="middle" fill="#d5ede9" font-size="32">AzurPilot · 模拟器测试画面</text></svg>'
@@ -618,7 +615,7 @@ export function createMockState({ empty = false } = {}) {
       case 'statistics.refreshLoot': return { refreshed: true }
       case 'meowfficer.scoreReport': {
         // demo-alt 用来验证「还没跑过评分任务」的空状态，其余实例都给一份示例报告。
-        if (name === 'demo-alt') fail('NOT_FOUND', '评分报告尚未生成，请先在「工具Plus → 指挥喵评分」运行一次任务')
+        if (name === 'demo-alt') fail('NOT_FOUND', '评分报告尚未生成，请先在「工具 → 指挥喵评分」运行一次任务')
         const cats = [{
           source: 'shot_0.png', cat: '克雷喵', tags: ['SSR', '铁血', '潜艇', '司令'], fixed: false,
           note: '指定潜艇司令，狩猎范围+1；初始池小、最好毕业', maxed: true, pointsSpent: 6, primary: 'submarine',
@@ -654,6 +651,7 @@ export function createMockState({ empty = false } = {}) {
         }]
         return { instance: name, generatedAt: timestamp(new Date()), count: cats.length, cats: cats.slice(-(params.limit ?? 100)) }
       }
+      case 'statistics.resourceFlows': return resourceFlows(params, snapshot(name), storageCatalog, name === 'demo-alt')
       case 'statistics.report': {
         const makePoints = (res, days = 7) => {
           if (name === 'demo-alt') return []
@@ -669,16 +667,33 @@ export function createMockState({ empty = false } = {}) {
           const dbKey = resKeyMap[res] ?? res
           const base = get(name).values.Dashboard[dbKey]?.Value ?? baseMap[res] ?? 500
           const safeDays = Math.max(1, Number(days) || 7)
+          // 与真实统计接口一致，发送墙上时钟微秒与紧凑点，供前端统一解码。
           return Array.from({ length: 24 }, (_, index) => ({
-            time: timestamp(new Date(Date.now() - (23 - index) * safeDays * 3600000)),
-            value: Math.max(0, Math.round(base * (.8 + index / 120 + Math.sin(index) * .03))),
+            t: Math.floor((Date.now() - (23 - index) * safeDays * 3600000) / 1000) * 1000000,
+            v: Math.max(0, Math.round(base * (.8 + index / 120 + Math.sin(index) * .03))),
           }))
         }
         const reportSeries = entries => entries.map(([key, label, res = key]) => ({
           key, label, points: makePoints(res, params.days)
         }))
         const result = { instance: name, category: params.category, month: params.month, metrics: [], series: [], tables: [], notes: [] }
-        if (params.category === 'resources') {
+        if (params.category === 'storage') {
+          result.notes = [name === 'demo-alt' ? '尚未运行仓库统计任务。' : '最近完整扫描：2026-10-03 00:00:00；复核 12 页。', '刷新只读取已有快照，运行仓库统计任务后才更新数量。']
+          const quantities = [153, 46, 20, 46, 58, 1, 32791, 1204, 881, 497, 1659, 1266, 1628, 745, 5015, 3584, 3785, 5634, 4230, 5297, 699, 859, 884, 753, 767]
+          result.series = storageCatalog.items.map((item, index) => ({
+            key: item.id, label: item.name,
+            icon: 'storage:' + item.templates[0].replace('assets/stats/', '').replace('.png', ''),
+            points: name === 'demo-alt' ? [] : [8, 3, 1, 0]
+              .filter(days => days < (params.days ?? 7))
+              .map(days => ({t: Math.floor((Date.now() - days * 86400000) / 1000) * 1000000,
+                v: Math.max(1, quantities[index] - days * 3), s: '仓库统计（cn）'})),
+          }))
+          result.tables = [{title: '仓库物品', note: result.notes.join(' '), columns: ['图标', '物品', '分类', '数量', '状态'],
+            rows: storageCatalog.items.map((item, index) => [
+              'storage:' + item.templates[0].replace('assets/stats/', '').replace('.png', ''),
+              item.name, item.group, name === 'demo-alt' ? null : quantities[index], name === 'demo-alt' ? '未扫描' : '已复核',
+            ])}]
+        } else if (params.category === 'resources') {
           result.series = reportSeries([
             ['oil', '石油', 'Oil'], ['coin', '物资', 'Coin'], ['gem', '钻石', 'Gem'], ['cube', '心智魔方', 'Cube'],
             ['pt', '活动 PT', 'Pt'], ['core', '核心数据', 'Core'], ['medal', '荣誉勋章', 'Medal'],
@@ -755,7 +770,7 @@ export function createMockState({ empty = false } = {}) {
           }]
         } else if (params.category === 'loot') {
           // 素材与服务端 module/api/statistics_service.py 的 loot 分支对齐：
-          // 上面收益卡片（金菜/彩图纸 + 今日/本月/选定月份总计）、中间收获明细、
+          // 上面收益卡片（指定掉落物品 + 今日/本月/选定月份总计）、中间收获明细、
           // 下面掉落记录，最后是原有的短猫按侵蚀等级的收益汇总。
           const items = [
             ['PlateGeneralT4', '通用部件T4', '金', 8, 5],
@@ -766,40 +781,56 @@ export function createMockState({ empty = false } = {}) {
             ['GearDesignPlanGunT5', '舰炮研发图纸UR型', '彩', 0, 0],
             ['GearDesignPlanTorpedoT5', '鱼雷研发图纸UR型', '彩', 0, 0],
             ['GearDesignPlanAntiAirT5', '防空炮研发图纸UR型', '彩', 0, 0],
-            ['GearDesignPlanPlaneT5', '舰载机研发图纸UR型', '彩', 1, 1]
+            ['GearDesignPlanPlaneT5', '舰载机研发图纸UR型', '彩', 1, 1],
+            ['GearDesignPlanT5', '装备研发图纸UR型', '彩', 1, 1],
+            ['GearDesignPlanGunT4', '舰炮研发图纸SSR型', '金', 7, 4],
+            ['GearDesignPlanTorpedoT4', '鱼雷研发图纸SSR型', '金', 5, 3],
+            ['GearDesignPlanAntiAirT4', '防空炮研发图纸SSR型', '金', 6, 4],
+            ['GearDesignPlanPlaneT4', '舰载机研发图纸SSR型', '金', 4, 2],
+            ['Ultra_High_Purity_Metals', '特种钢材', '金', 14, 8],
+            ['Military_Grade_Electronic_Components', '军工级电子元件', '金', 12, 7],
+            ['HBX_Blend_Gunpowder', 'HBX炸药', '金', 11, 6],
+            ['High_Durability_Elastomers', '氟橡胶', '金', 10, 5],
+            ['Superconductive_Metals', '超导铜', '金', 13, 7],
+            ['Corrosion_Resistant_Alloys', '钛合金', '金', 9, 5],
+            ['OrdnanceTestingReportT4', '机密实验计划', '金', 3, 3],
+            ['OrdnanceTestingReportT5', '绝密实验计划', '彩', 1, 1],
+            ['PrototypeGearPartsT5', '特装型突破部件', '彩', 2, 2]
           ]
           const empty = name === 'demo-alt'
           result.taskOptions = [
-            { key: 'opsi_daily', label: '大世界每日Plus', count: 0 },
+            { key: 'opsi_daily', label: '大世界每日', count: 0 },
             { key: 'opsi_obscure', label: '隐秘海域', count: 0 },
             { key: 'opsi_abyssal', label: '深渊坐标', count: 0 },
             { key: 'opsi_stronghold', label: '塞壬要塞', count: empty ? 0 : 1 },
+            { key: 'opsi_month_boss', label: '月度Boss', count: empty ? 0 : 1 },
             { key: 'opsi_meowfficer_farming', label: '耄耋相接', count: empty ? 0 : 19 }
           ]
           const detail = {
             title: '大世界掉落明细',
             columns: ['图标', '物品', '稀有度', '总收益', '掉落记录数', '平均每次掉落'],
-            note: '暂时只统计金菜（通用/主炮/鱼雷/防空炮/舰载机 部件T4）与彩图纸（舰炮/鱼雷/防空炮/舰载机 研发图纸UR型）；其他物品照常入库，只是不在这里展示。',
+            note: '统计金菜（部件T4）、装备研发图纸SSR/UR型、六种金色研发材料、机密/绝密实验计划及特装型突破部件；其他物品照常入库，只是不在这里展示。',
             defaultSort: { index: 3, descending: true },
             rows: empty ? [] : items.map(([key, zh, rarity, amount, count]) => [
-              `opsi:${key}`, zh, rarity, amount || null, count || null, count ? 1.6 : null
+              `opsi:${key}`, zh, rarity, amount || null, count || null, count ? Math.round(amount / count * 10) / 10 : null
             ])
           }
           result.metrics = empty ? [] : [
-            { label: '掉落记录', value: 20, unit: '次' },
+            { label: '掉落记录', value: 21, unit: '次' },
             ...items.map(([key, zh, , amount]) => ({ label: zh, value: amount || null, unit: '', icon: `opsi:${key}` })),
             { label: '今日总计', value: 7, unit: '' },
-            { label: '本月总计', value: 32, unit: '' },
-            { label: '选定月份总计', value: 32, unit: '' }
+            { label: '本月总计', value: items.reduce((total, item) => total + item[3], 0), unit: '' },
+            { label: '选定月份总计', value: items.reduce((total, item) => total + item[3], 0), unit: '' }
           ]
           result.tables = empty ? [detail] : [
             detail,
             {
               title: '掉落记录',
               columns: ['时间', '任务', '海域', '掉落物'],
-              note: '按时间倒序；只列掉了金菜或彩图纸的记录，其余掉落不入这张表。',
+              note: '按时间倒序；只列含上述统计物品的掉落记录，其余掉落不入这张表。',
               defaultSort: { index: 0, descending: true },
               rows: [
+                ['2026-09-25 08:00:00', '月度Boss', '月度Boss海域', '机密实验计划 x1、绝密实验计划 x1、特装型突破部件 x1、特种钢材 x2、装备研发图纸UR型 x1'],
                 ['2026-09-25 07:58:28', '耄耋相接', '危险海域 Mediterranee A（侵蚀5）', '鱼雷部件T4 x1'],
                 ['2026-09-25 07:30:33', '耄耋相接', '危险海域 Mediterranee A（侵蚀5）', '舰载机研发图纸UR型 x1、通用部件T4 x1、主炮部件T4 x1'],
                 ['2026-09-23 12:04:51', '塞壬要塞', '要塞海域 East Continental Shelf E（侵蚀3）', '通用部件T4 x4、主炮部件T4 x1、鱼雷部件T4 x1、防空炮部件T4 x1、舰载机部件T4 x1']
@@ -974,20 +1005,60 @@ export function createMockState({ empty = false } = {}) {
           url: 'https://github.com/wess09/AzurPilot'
         }
       case 'events.subscribe':
-        if (params.topics.some(topic => topic !== 'instances') && !name) fail('INVALID_PARAMS', '订阅此主题需要指定实例')
+        if (params.topics.some(topic => topic !== 'instances' && topic !== 'notifications') && !name) fail('INVALID_PARAMS', '订阅此主题需要指定实例')
         return { topics: params.topics, instance: name ?? null }
       case 'background.gallery.list': return []
       case 'background.gallery.open': return { path: 'cache/background/library' }
       case 'background.gallery.remove': return { removed: true }
       case 'background.gallery.add': return { entry: { id: 'mock_bg', name: params.name || 'mock', kind: 'image', size: 1024, added: Date.now() } }
+      case 'remote.pair.create':
+        mockClients = [
+          { id: '11112222333344445555666677778888', created_at: 1729214415 },
+          { id: 'aaaabbbbccccddddeeeeffff00001111', created_at: 1729214533 },
+          { id: '22223333444455556666777788889999', created_at: 1729214650 },
+          { id: 'bbbbccccddddeeeeffff000011112222', created_at: 1729214780 },
+          { id: '3333444455556666777788889999aaaa', created_at: 1729214910 },
+        ]
+        return {
+          id: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+          client_id: '11112222333344445555666677778888',
+          code: '849201',
+          particle_secret: '0123456789abcdef0123456789abcdef',
+          expires_at: Math.floor(Date.now() / 1000) + 300,
+        }
+      case 'remote.pair.status':
+        return { state: 'pending' }
+      case 'remote.clients':
+        return structuredClone(mockClients)
+      case 'remote.revoke':
+        mockClients = mockClients.filter(item => item.id !== params.id)
+        return { revoked: true }
       default: fail('METHOD_NOT_FOUND', '此方法由连接层处理')
     }
   }
   function tick() {
+    for (const [name, item] of simulations) if (item.running) {
+      const settings = get(name).values.OpsiSimulator.OpsiSimulatorParameters
+      item.running = false
+      if (!(settings.TimeUseRatio > 0 && settings.TimeUseRatio <= 1) || item.totalSamples <= 0) {
+        item.state = 'failed'; item.error = '样本数和时间利用率必须为正数，利用率不能超过 1'
+        simulationLog(item, item.error)
+        continue
+      }
+      item.state = 'completed'; item.completedSamples = item.totalSamples
+      item.result = {cl1Count: 123, meowCount: 45, crashedProbability: .02,
+        cl1Time: 7380, meowTime: 9000, ap: 485.3, coin: 100510}
+      if (settings.Draw !== 'do_not') {
+        item.figure = `mock-${item.runId}.svg`
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300"><rect width="900" height="300" fill="white"/><text x="40" y="35" font-size="18">模拟服务示例轨迹</text><path d="M40 70 250 140 450 90 650 180 860 200" fill="none" stroke="blue"/><path d="M40 230 250 180 450 140 650 100 860 70" fill="none" stroke="orange"/></svg>'
+        item.image = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+      }
+      simulationLog(item, '[模拟结果] 最终行动力: 485.3，最终黄币: 100510（模拟服务示例）。')
+    }
     for (const [name, item] of instances) if (item.status === 'running') {
       item.previewAt = new Date().toISOString()
       log(name, '模拟任务正在运行，等待下一轮调度。')
     }
   }
-  return { dispatch, tick, setUpdateScenario }
+  return { dispatch, tick, setUpdateScenario, subscribeStock:stock.subscribe, close:stock.close }
 }

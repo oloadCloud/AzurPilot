@@ -1,4 +1,5 @@
 import os
+import random
 import subprocess
 import sys
 from typing import Optional, Union
@@ -10,12 +11,25 @@ from deploy.Windows.utils import DEPLOY_CONFIG, DEPLOY_TEMPLATE, cached_property
 
 
 GIT_OVER_CDN_REPOSITORY = 'git://git.pull/AzurPilot'
-GIT_OVER_CDN_FALLBACK_REPOSITORY = 'https://gitcode.com/ddl2/AzurLaneAutoScript'
 GITHUB_REPOSITORY = 'https://github.com/wess09/AzurPilot'
+GIT_OVER_CDN_FALLBACK_REPOSITORIES = [
+    'https://cnb.cool/AzurPilot/AzurPilot',
+    'https://gitcode.com/ddl2/AzurPilot',
+]
+GIT_OVER_CDN_FALLBACK_REPOSITORY = GIT_OVER_CDN_FALLBACK_REPOSITORIES[1]
+
+
+def choose_fallback_repository() -> str:
+    """在可用的国内镜像源（CNB 与 GitCode）之间分流，避免单一镜像源流量过大引发风控。"""
+    return random.choice(GIT_OVER_CDN_FALLBACK_REPOSITORIES)
 
 
 class ExecutionError(Exception):
-    pass
+    """部署流程执行失败；code 取 deploy.config.ErrorCodes，供上游结构化识别。"""
+
+    def __init__(self, code: int = 1, message: str = ''):
+        super().__init__(message or f'deploy failed with error code {code}')
+        self.code = code
 
 
 class ConfigModel:
@@ -55,6 +69,8 @@ class ConfigModel:
     # 远程访问
     EnableRemoteAccess: bool = False
     RemoteAccessMode: str = "auto"
+    CloudflareRegistry: str = "https://remote.azurpilot.com"
+    CloudflareDeviceId: str = ""
     SSHUser: Optional[str] = None
     SSHServer: Optional[str] = None
     SSHExecutable: Optional[str] = None
@@ -126,7 +142,11 @@ class DeployConfig(DeployConfigTransaction, ConfigModel):
         if self.Repository in ['global']:
             super().__setattr__('Repository', 'https://github.com/wess09/AzurPilot')
         if self.Repository in ['cn', GIT_OVER_CDN_REPOSITORY]:
-            super().__setattr__('Repository', GIT_OVER_CDN_FALLBACK_REPOSITORY)
+            super().__setattr__('Repository', choose_fallback_repository())
+        if self.Repository in ['cnb']:
+            super().__setattr__('Repository', GIT_OVER_CDN_FALLBACK_REPOSITORIES[0])
+        if self.Repository in ['gitcode']:
+            super().__setattr__('Repository', GIT_OVER_CDN_FALLBACK_REPOSITORIES[1])
 
     def _redirect_github_repository(self):
         """为官方 GitHub 源一次性选择适合当前网络的更新镜像。"""
@@ -241,7 +261,9 @@ class DeployConfig(DeployConfigTransaction, ConfigModel):
             else:
                 logger.info(f"[ failure ], error_code: {error_code}")
                 self.show_error(command)
-                raise ExecutionError
+                raise ExecutionError(
+                    10, f'Command failed (exit {error_code}): {command}'
+                )
         else:
             logger.info(f"[ success ]")
             return True

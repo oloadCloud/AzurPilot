@@ -80,7 +80,7 @@ def pick_cat_name(texts) -> str:
     """从一组 OCR 文本结果里提取指挥喵名称。
 
     猫名可能是玩家自定义的，所以不强行匹配天赋库，只做去噪：
-    取 2~6 个字、含汉字、且不含界面词的最长候选。
+    取 2~6 个字、含汉字、且不含界面词或舰队标签的最长候选。
 
     Args:
         texts (list[str]): OCR 识别出的文本序列。
@@ -96,6 +96,8 @@ def pick_cat_name(texts) -> str:
         if not any('\u4e00' <= char <= '\u9fff' for char in text):
             continue
         if any(word in text for word in NAME_NOISE):
+            continue
+        if re.search(r'[舰艦]\s*[队隊]', text):
             continue
         if len(text) > len(best):
             best = text
@@ -159,8 +161,6 @@ MEOWFFICER_PLAY_CONFIRM = Button(
 # 也不能照抄 collect.py 里的 threshold=30 —— 那是很宽松的相似度，几乎任何像素都算命中。
 PLAY_CONFIRM_THRESHOLD = 235
 PLAY_CONFIRM_COUNT = 1000
-# 单次导航最多尝试关几次弹窗：连点会触发 ALAS 的点击保护，到上限就报错收手
-MAX_PLAY_POPUP_TRIES = 2
 
 # 左下角「当前显示的猫」名字与等级区域。
 # 右边界刻意停在 640：再往右会和右侧天赋面板的左缘（约 690）重叠，

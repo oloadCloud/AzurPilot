@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { VALID_CATEGORIES } from './statisticsPrefs'
 import type {StatisticsLayout} from './statisticsLayout'
 import {DEFAULT_TABLE_ROWS, readStatisticsLayout, setTableDisplay, tableDisplay, writeStatisticsLayout} from './statisticsLayout'
-import {cardKey, DEFAULT_STATISTICS_LAYOUT, defaultStatisticsLayout, EDIT_MODE_KEY, hideCard, isCardHidden, isChartCompact, isLinked, isMetricsTable, isPickerHidden, isSeriesFiltered, isStackedRise, LAYOUT_KEY, linkChains, readChains, rechain, setChartCompact, setMetricsTable, setPickerHidden, setStackedRise, showCard, splitChains, toggleSeriesFilter} from './statisticsLayout'
+import {cardKey, DEFAULT_STATISTICS_LAYOUT, defaultStatisticsLayout, EDIT_MODE_KEY, hideCard, isCardHidden, isChartCompact, isLinked, isMetricsTable, isPickerHidden, isSeriesFiltered, isStackedRise, LAYOUT_KEY, linkChains, pageNeedsSeries, readChains, rechain, setChartCompact, setMetricsTable, setPickerHidden, setStackedRise, showCard, splitChains, toggleSeriesFilter} from './statisticsLayout'
 
 function memoryStorage() {
   const map = new Map<string, string>()
@@ -213,8 +213,6 @@ describe('统计页卡片组合', () => {
     expect(readChains(stored, 'commission', [[chart, first]])).toEqual([[chart], [first, second]])
   })
 
-  it('只有含表格的一对才允许连接', () => {
-  })
 
   it('连接合并两链，已经同链时原样返回', () => {
     const linked = linkChains([[chart], [first]], chart, first)
@@ -264,6 +262,15 @@ describe('统计页卡片隐藏', () => {
     expect(hideCard(DEFAULT_STATISTICS_LAYOUT, 'nonsense')).toBe(DEFAULT_STATISTICS_LAYOUT)
     expect(isCardHidden(DEFAULT_STATISTICS_LAYOUT, 'nonsense')).toBe(false)
   })
+
+  it('图表与原始记录都隐藏时才不再需要序列数据', () => {
+    const page = 'resources'
+    expect(pageNeedsSeries(DEFAULT_STATISTICS_LAYOUT, page)).toBe(true)
+    const chartHidden = hideCard(DEFAULT_STATISTICS_LAYOUT, cardKey(page, 'chart'))
+    expect(pageNeedsSeries(chartHidden, page)).toBe(true)
+    const bothHidden = hideCard(chartHidden, cardKey(page, 'raw'))
+    expect(pageNeedsSeries(bothHidden, page)).toBe(false)
+  })
 })
 
 describe('统计页链的存档语义', () => {
@@ -273,46 +280,6 @@ describe('统计页链的存档语义', () => {
     expect(readChains(untouched, 'commission', fallback)).toEqual(fallback)
     const cleared: StatisticsLayout = {...DEFAULT_STATISTICS_LAYOUT, cards: {commission: []}}
     expect(readChains(cleared, 'commission', fallback)).toEqual([])
-  })
-})
-
-describe('页面各自的取数参数', () => {
-  const fallback = {days: 7, month: '2026-01', period: 'day' as const, researchSeries: 'a', lootTask: 'b'}
-
-  it('未单独设置时用调用方的默认值', async () => {
-    const layout = await loadLayout()
-    const loaded = layout.readStatisticsLayout()
-
-    expect(layout.readPageView(loaded, VALID_CATEGORIES[0], fallback)).toEqual(fallback)
-  })
-
-  it('写入后从存储读回', async () => {
-    const layout = await loadLayout()
-    const next = layout.writePageView(layout.readStatisticsLayout(), VALID_CATEGORIES[1], {days: 30, period: 'month'})
-    layout.writeStatisticsLayout(next)
-
-    const loaded = layout.readStatisticsLayout()
-    const view = layout.readPageView(loaded, VALID_CATEGORIES[1], fallback)
-    expect(view.days).toBe(30)
-    expect(view.period).toBe('month')
-    expect(view.month).toBe(fallback.month)
-  })
-
-  it('旧存档没有该字段时读作未设置', async () => {
-    const layout = await loadLayout()
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify({version: 1, pages: [[VALID_CATEGORIES[0]]]}))
-
-    const loaded = layout.readStatisticsLayout()
-    expect(loaded.views).toEqual({})
-    expect(layout.readPageView(loaded, VALID_CATEGORIES[0], fallback)).toEqual(fallback)
-  })
-
-  it('字段类型不符的项被丢弃，合法项保留', async () => {
-    const layout = await loadLayout()
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify({version: 1, views: {[VALID_CATEGORIES[2]]: {days: 'x', period: 'week', unknown: 1}}}))
-
-    const loaded = layout.readStatisticsLayout()
-    expect(loaded.views[VALID_CATEGORIES[2]]).toEqual({period: 'week'})
   })
 })
 

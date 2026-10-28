@@ -171,6 +171,8 @@ class TestWorkerEvents(unittest.TestCase):
 
         with (patch.object(self.manager, "_drain_worker_queue", side_effect=drain),
               patch("module.runtime.process_manager.Process", return_value=new_process),
+              patch("module.runtime.process_manager.prepare_statistics"),
+              patch("module.api.account_service.prepare_worker", return_value=None),
               patch.object(self.manager, "_register_process"),
               patch.object(self.manager, "start_log_queue_handler"),
               patch.object(State, "_clearup", False),
@@ -268,6 +270,7 @@ class TestWorkerEvents(unittest.TestCase):
                       patch.dict("os.environ", {"DEMO": "0"}),
                       patch("module.runtime.process_manager.set_file_logger"),
                       patch("module.runtime.process_manager.set_func_logger"),
+                      patch("module.runtime.process_manager.prepare_statistics"),
                       patch("module.runtime.process_manager.logger"),
                       patch("module.runtime.process_manager.get_available_func", return_value=["Main"])):
                     ProcessManager.run_process("test", "Main", output, event, run_id="run")

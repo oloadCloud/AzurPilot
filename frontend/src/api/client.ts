@@ -6,23 +6,13 @@ import type { Parameters } from './generated'
 import type { ApiEvent, ApiResponse, Results } from './types'
 import { translateCurrentUi } from '../i18n'
 
-/** API 业务错误封装类。 */
+/** API 业务错误。 */
 export class ApiError extends Error {
-  /**
-   * 构造 API 错误实例。
-   *
-   * @param code 错误代码。
-   * @param message 错误描述信息。
-   * @param details 可选的附加错误详情。
-   */
   constructor(public code: string, message: string, public details?: unknown) { super(message) }
 }
-export type Connection = 'connecting' | 'ready' | 'auth' | 'offline'
+type Connection = 'connecting' | 'ready' | 'auth' | 'offline'
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
 
-/**
- * WebSocket API 客户端核心类。
- */
 export class ApiClient {
   private socket?: WebSocket
   private pending = new Map<string, Pending>()
@@ -31,6 +21,7 @@ export class ApiClient {
   private retry?: ReturnType<typeof setTimeout>
   private heartbeat?: ReturnType<typeof setInterval>
   private password = ''
+  private launcherTicket?: string
   private attempt = 0
   private stopped = true
   private state: Connection = 'connecting'
@@ -45,13 +36,19 @@ export class ApiClient {
   onEvent = (listener: (event: ApiEvent) => void) => { this.events.add(listener); return () => { this.events.delete(listener) } }
   private setState(state: Connection) { this.state = state; this.listeners.forEach(listener => listener()) }
 
-  /**
-   * 建立 WebSocket 连接。
-   */
   connect = () => {
     if (this.socket && this.socket.readyState < 2) return
     if (!this.password) { try { this.password = window.localStorage.getItem('azurpilot.access-password') ?? '' } catch { /* 浏览器禁用存储时保留会话登录。 */ } }
     this.stopped = false
+    try {
+      const page = new URL(window.location.href)
+      const ticket = page.searchParams.get('launcherTicket')
+      if (ticket) {
+        this.launcherTicket = ticket
+        page.searchParams.delete('launcherTicket')
+        window.history.replaceState(null, '', page.toString())
+      }
+    } catch { /* 无导航上下文的测试及受限浏览器仍可正常连接。 */ }
     this.setState('connecting')
     // 远程访问隧道把页面挂在 /<peer_id>/ 前缀下（index.html 用 <base> 固定该前缀），
     // 绝对路径 /api/v1/ws 会打到隧道服务端而不是本机，必须跟着 document.baseURI 走。
@@ -74,7 +71,13 @@ export class ApiClient {
       } else if (message.type === 'event') {
         if (message.topic === 'session') {
           const data = message.data as {authRequired: boolean}
-          if (!data.authRequired) this.ready()
+          if (this.launcherTicket) {
+            const ticket = this.launcherTicket
+            this.launcherTicket = undefined
+            void this.request('auth.launcher', {ticket}).then(() => this.ready())
+              .catch(() => { if (!data.authRequired) this.ready(); else this.setState('auth') })
+          }
+          else if (!data.authRequired) this.ready()
           else if (this.password) void this.login(this.password).catch(() => this.setState('auth'))
           else this.setState('auth')
         }
@@ -108,8 +111,6 @@ export class ApiClient {
 
   /**
    * 使用访问密码执行鉴权登录。
-   *
-   * @param password 访问密码。
    */
   async login(password: string) {
     try { await this.request('auth.login', {password}) } catch (error) {
@@ -126,13 +127,9 @@ export class ApiClient {
 
   /**
    * 发送 RPC 请求并等待返回结果。
-   *
-   * @param method 调用的方法名。
-   * @param params 请求参数对象。
-   * @returns 响应结果 Promise。
    */
   request<M extends keyof Results & keyof Parameters>(method: M, params: Parameters[M]): Promise<Results[M]> {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || (this.state !== 'ready' && method !== 'auth.login')) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || (this.state !== 'ready' && method !== 'auth.login' && method !== 'auth.launcher')) {
       return Promise.reject(new ApiError('DISCONNECTED', translateCurrentUi('api.notConnected')))
     }
     const id = `${Date.now()}-${++this.counter}`

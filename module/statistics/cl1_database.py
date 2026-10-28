@@ -1,27 +1,68 @@
 """CL1 数据库模块。
 
-使用 SQLite 本地存储战斗统计和掉落数据，支持 AES 加密传输。
-提供设备识别、数据序列化和与 AzurStats 云端同步的功能。
+月度计数、事件与收益使用总库原生表；未知字段通过类型化兼容树保留。
+旧存储的只读解码由安装级迁移器统一处理。
 """
 
 # -*- coding: utf-8 -*-
-import sqlite3
 import json
-import os
-from contextlib import closing, contextmanager, suppress
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA256
 from collections import defaultdict
-from module.base.device_id import get_device_id, get_old_device_id
 from module.config.time_source import now as current_time
 from module.logger import logger
 
 
+# 凭证快照的抽取粒度与历史迁移版本。
+COINS_EXACT_DAYS = 3
+COINS_HISTORY_VERSION = 2
+COINS_CLEANUP_VERSION = 1
+
+
+def thin_coins_snapshots(snapshots: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """按保留策略整理凭证快照：最近若干天逐条，更早的每小时只留最后一条。
+
+    凭证写入很频繁（约 3 分钟一条），逐条无限增长会让月度 JSON 越来越大；
+    早期实现直接丢弃最旧的记录，历史因此只剩几天。改为抽稀后体积有界、历史保留。
+
+    Args:
+        snapshots: 凭证快照列表，元素含 ts 等字段。
+
+    Returns:
+        list[dict]: 按时间升序整理后的快照列表。
+    """
+    if not snapshots:
+        return snapshots
+    cutoff = datetime.now() - timedelta(days=COINS_EXACT_DAYS)
+    kept: List[Dict[str, Any]] = []
+    last_hour = None
+    for snapshot in sorted(snapshots, key=lambda item: str(item.get('ts', ''))):
+        try:
+            stamp = datetime.fromisoformat(str(snapshot['ts']))
+        except (KeyError, ValueError):
+            kept.append(snapshot)
+            last_hour = None
+            continue
+        if stamp >= cutoff:
+            kept.append(snapshot)
+            last_hour = None
+            continue
+        hour = stamp.strftime('%Y-%m-%dT%H')
+        if hour == last_hour:
+            kept[-1] = snapshot
+        else:
+            kept.append(snapshot)
+            last_hour = hour
+    return kept
+
+
 class Cl1Database:
+    # 已补齐凭证历史的实例。
+    _coins_history_checked: set = set()
+    # 已清理过月初紫币残留的实例。
+    _coins_cleanup_checked: set = set()
     @staticmethod
     def _coerce_int(value: Any) -> int:
         """严格转换为 int；无效输入由调用方按上下文捕获处理。"""
@@ -120,233 +161,32 @@ class Cl1Database:
             self._save_stats_in_connection(conn, instance, month, data)
 
     """
-    CL1 明文 SQLite 数据库管理类。
-    所有实例共享一个数据库文件；旧版 encrypted_blob 仅用于自动解密迁移。
+    CL1 月度统计存储管理类。
+    所有实例共享一个数据库文件；旧版 encrypted_blob 仅用于自动读取还原迁移。
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
-        self._manage_legacy_db_path = db_path is None
-        if db_path is None:
-            project_root = Path(__file__).resolve().parents[2]
-            self.db_dir = project_root / "config"
-            self.db_path = self.db_dir / "cl1_data.db"
-        else:
-            self.db_path = db_path
-            self.db_dir = self.db_path.parent
+    def __init__(self, db_path: Optional[Path] = None, *, store=None):
+        from module.persistence.database import for_legacy_path
+        self._store = store or (for_legacy_path(db_path, 'cl1') if db_path is not None else None)
 
-        self._ensure_dir()
-        if self._manage_legacy_db_path:
-            self._move_legacy_db()
-        self._init_db()
-        self._legacy_decryption_keys = self._get_legacy_decryption_keys()
-        self._migrate_encrypted_rows()
-        if self._manage_legacy_db_path:
-            self._auto_migrate()
+    @property
+    def store(self):
+        from module.persistence.database import get_database
+        return self._store or get_database()
 
-    def _ensure_dir(self):
-        try:
-            self.db_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            logger.error(f"[Statistics] 创建数据库目录失败: {e}")
+    @property
+    def db_path(self):
+        return self.store.path
 
-    def _init_db(self):
-        """初始化数据库表，并兼容旧版 encrypted_blob 结构。"""
-        try:
-            with closing(sqlite3.connect(self.db_path)) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS cl1_data (
-                        instance TEXT,
-                        month TEXT,
-                        data_json TEXT,
-                        encrypted_blob BLOB,
-                        PRIMARY KEY (instance, month)
-                    )
-                """)
-                cursor.execute("PRAGMA table_info(cl1_data)")
-                columns = {row[1] for row in cursor.fetchall()}
-                if "data_json" not in columns:
-                    cursor.execute("ALTER TABLE cl1_data ADD COLUMN data_json TEXT")
-                if "encrypted_blob" not in columns:
-                    cursor.execute("ALTER TABLE cl1_data ADD COLUMN encrypted_blob BLOB")
-                conn.commit()
-        except Exception as e:
-            logger.exception(f"初始化 CL1 数据库失败: {e}")
+    @property
+    def db_dir(self):
+        return self.store.directory
 
-    def _derive_key(self, device_id: str) -> bytes:
-        """基于 device_id 派生 256 位 AES 密钥"""
-        salt = b"AlasCl1SecureStorage"  # 固定盐
-        return PBKDF2(
-            device_id.encode(), salt, dkLen=32, count=1000, hmac_hash_module=SHA256
-        )
-
-    def _get_legacy_decryption_keys(self) -> List[bytes]:
-        """生成旧密文迁移时可尝试的解密密钥。"""
-        device_ids = []
-        with suppress(Exception):
-            device_ids.append(get_device_id())
-        old_id = get_old_device_id()
-        if old_id:
-            device_ids.append(old_id)
-
-        keys = []
-        seen = set()
-        for device_id in device_ids:
-            if not device_id or device_id in seen:
-                continue
-            seen.add(device_id)
-            keys.append(self._derive_key(device_id))
-        return keys
-
-    def _migrate_encrypted_rows(self):
-        """将旧版 AES-GCM 密文行迁移为明文 JSON。"""
-        try:
-            with self._stats_transaction() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT instance, month, data_json, encrypted_blob
-                    FROM cl1_data
-                    WHERE encrypted_blob IS NOT NULL
-                      AND length(encrypted_blob) > 0
-                    """
-                )
-                rows = cursor.fetchall()
-
-                if not rows:
-                    return
-
-                logger.info(f"[Statistics] 开始解密旧版 CL1 数据库，条目数: {len(rows)}")
-                updated_rows = []
-                clear_rows = []
-                failed_rows = []
-                for instance, month, data_json, blob in rows:
-                    if self._deserialize_data(data_json) is not None:
-                        clear_rows.append((instance, month))
-                        continue
-
-                    data = self._decrypt(blob)
-                    if data is None:
-                        failed_rows.append((instance, month))
-                        continue
-
-                    updated_rows.append((self._serialize_data(data), instance, month))
-
-                if updated_rows:
-                    cursor.executemany(
-                        """
-                        UPDATE cl1_data
-                        SET data_json = ?, encrypted_blob = NULL
-                        WHERE instance = ? AND month = ?
-                        """,
-                        updated_rows,
-                    )
-                if clear_rows:
-                    cursor.executemany(
-                        """
-                        UPDATE cl1_data
-                        SET encrypted_blob = NULL
-                        WHERE instance = ? AND month = ?
-                        """,
-                        clear_rows,
-                    )
-
-                migrated = len(updated_rows) + len(clear_rows)
-                if migrated:
-                    logger.info(f"[Statistics] 旧版 CL1 数据库解密迁移完成，条目数: {migrated}")
-                if failed_rows:
-                    logger.warning(
-                        f"[Statistics] 旧版 CL1 数据库有 {len(failed_rows)} 条记录解密失败"
-                    )
-        except Exception as e:
-            logger.error(f"[Statistics] 解密旧版 CL1 数据库失败: {e}")
-
-    def _move_legacy_db(self):
-        """将旧位置的 CL1 数据库移动到 config 目录后再初始化表结构。"""
-        project_root = Path(__file__).resolve().parents[2]
-        old_db_dir = project_root / "log" / "cl1"
-        old_db_path = old_db_dir / "cl1_data.db"
-
-        if old_db_path.exists() and not self.db_path.exists():
-            import shutil
-
-            try:
-                shutil.move(str(old_db_path), str(self.db_path))
-                logger.info(
-                    f"已移动旧版 CL1 数据库: {old_db_path} -> {self.db_path}"
-                )
-            except Exception as e:
-                logger.error(f"[Statistics] 移动旧版 CL1 数据库失败: {e}")
-
-    def _serialize_data(self, data: Dict[str, Any]) -> str:
-        """将统计数据序列化为明文 JSON。"""
-        return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-
-    def _deserialize_data(self, data_json: Optional[str]) -> Optional[Dict[str, Any]]:
-        """从明文 JSON 读取统计数据。"""
-        if not data_json:
-            return None
-        try:
-            data = json.loads(data_json)
-        except Exception as e:
-            logger.warning(f"[Statistics] 读取 CL1 明文 JSON 失败: {e}")
-            return None
-        return data if isinstance(data, dict) else None
-
-    def _decrypt_payload(self, blob: bytes, key: bytes) -> Dict[str, Any]:
-        nonce = blob[:16]
-        tag = blob[16:32]
-        ciphertext = blob[32:]
-        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-        plaintext = cipher.decrypt_and_verify(ciphertext, tag)
-        return json.loads(plaintext.decode("utf-8"))
-
-    def _decrypt_with_key(self, blob: bytes, key: bytes) -> Optional[Dict[str, Any]]:
-        """辅助方法：使用指定密钥进行解密"""
-        if not blob or len(blob) < 32:
-            return None
-        try:
-            return self._decrypt_payload(blob, key)
-        except Exception:
-            return None
-
-    def _decrypt(self, blob: bytes) -> Optional[Dict[str, Any]]:
-        """尝试解密旧版 AES-GCM 数据。"""
-        if not blob or len(blob) < 32:
-            return None
-        for key in self._legacy_decryption_keys:
-            data = self._decrypt_with_key(blob, key)
-            if data is not None:
-                return data
-        return None
 
     def get_stats(self, instance: str, month: str) -> Dict[str, Any]:
-        """获取指定实例和月份的统计数据"""
-        try:
-            with closing(sqlite3.connect(self.db_path)) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT data_json, encrypted_blob FROM cl1_data WHERE instance = ? AND month = ?",
-                    (instance, month),
-                )
-                row = cursor.fetchone()
-                if row:
-                    data = self._deserialize_data(row[0])
-                    if data is not None:
-                        return data
-                    if row[1] and isinstance(data := self._decrypt(row[1]), dict):
-                        try:
-                            with self._stats_transaction() as write_conn:
-                                data = self._get_stats_in_connection(write_conn, instance, month)
-                                self._save_stats_in_connection(write_conn, instance, month, data)
-                        except Exception:
-                            # 迁移只是读取时的可选维护，保存失败仍返回已经解密的数据。
-                            logger.warning(f"[Statistics] 旧数据迁移未落盘: {instance} {month}")
-                        return data
-        except Exception as e:
-            logger.error(f"[Statistics] 查询统计数据失败 {instance} {month}: {e}")
+        with self.store.transaction(write=False) as connection:
+            return self._get_stats_in_connection(connection, instance, month)
 
-        return self._empty_data(month)
 
     def _empty_data(self, month: str) -> Dict[str, Any]:
         return {
@@ -580,23 +420,13 @@ class Cl1Database:
         return int(raw_battle_count), effective_rounds, should_save
 
     def _list_stats_rows(self, instance: Optional[str] = None) -> List[Tuple[str, str]]:
-        """列出数据库中已有的实例与月份。"""
-        try:
-            with closing(sqlite3.connect(self.db_path)) as conn:
-                cursor = conn.cursor()
-                if instance:
-                    cursor.execute(
-                        "SELECT instance, month FROM cl1_data WHERE instance = ? ORDER BY month",
-                        (instance,),
-                    )
-                else:
-                    cursor.execute(
-                        "SELECT instance, month FROM cl1_data ORDER BY instance, month"
-                    )
-                return [(row[0], row[1]) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"[Statistics] 列出统计数据失败: {e}")
-            return []
+        with self.store.transaction(write=False) as connection:
+            if instance is None:
+                rows = connection.execute('SELECT instance,month FROM cl1_months ORDER BY instance,month')
+            else:
+                rows = connection.execute('SELECT instance,month FROM cl1_months WHERE instance=? ORDER BY month', (instance,))
+            return [(row[0], row[1]) for row in rows]
+
 
     def backfill_meow_stats(
         self, instance: str, year: int = None, month: int = None
@@ -658,47 +488,26 @@ class Cl1Database:
             with self._stats_transaction() as conn:
                 self._save_stats_in_connection(conn, instance, month, data)
         except Exception as e:
-            logger.error(f"[Statistics] 保存统计数据失败 {instance} {month}: {e}")
+            logger.error(f"[Statistics] 保存统计数据失败 {instance} {month}: {type(e).__name__}")
             raise
 
     @contextmanager
     def _stats_transaction(self):
-        """读取前取得 SQLite 写锁，跨线程和进程串行化整个读改写过程。
+        """整次统计读改写使用同一个总库写事务。"""
+        with self.store.transaction() as connection:
+            yield connection
 
-        连接上下文负责提交及异常回滚，closing 保证提交失败也释放连接。
-        """
-        with closing(sqlite3.connect(self.db_path)) as conn:
-            with conn:
-                conn.execute("BEGIN IMMEDIATE")
-                yield conn
 
     def _save_stats_in_connection(self, conn, instance, month, data):
-        """在调用方事务中写入单个月份，不自行提交。"""
-        conn.execute(
-            """
-            INSERT INTO cl1_data (instance, month, data_json, encrypted_blob)
-            VALUES (?, ?, ?, NULL)
-            ON CONFLICT(instance, month) DO UPDATE SET
-                data_json = excluded.data_json,
-                encrypted_blob = NULL
-            """,
-            (instance, month, self._serialize_data(data)),
-        )
+        from module.persistence.snapshots import save_month
+        save_month(conn, instance, month, data)
+
 
     def _get_stats_in_connection(self, conn, instance, month):
-        """事务中的读取不能把数据库错误或损坏行当成空数据覆盖。"""
-        row = conn.execute(
-            "SELECT data_json, encrypted_blob FROM cl1_data WHERE instance = ? AND month = ?",
-            (instance, month),
-        ).fetchone()
-        if row is None:
-            return self._empty_data(month)
-        data = self._deserialize_data(row[0])
-        if data is None and row[1]:
-            data = self._decrypt(row[1])
-        if not isinstance(data, dict):
-            raise ValueError(f"统计数据无法解码: {instance} {month}")
-        return data
+        from module.persistence.snapshots import read_month
+        data = read_month(conn, instance, month)
+        return self._empty_data(month) if data is None else data
+
 
     def increment_battle_count(self, instance: str, delta: int = 1):
         """增加战斗次数"""
@@ -708,13 +517,15 @@ class Cl1Database:
             data["battle_count"] = data.get("battle_count", 0) + delta
             self._save_stats_in_connection(conn, instance, month, data)
 
-    def increment_akashi_encounter(self, instance: str):
-        """增加明石奇遇次数"""
-        month = datetime.now().strftime("%Y-%m")
+    def increment_akashi_encounter(self, instance: str, month: Optional[str] = None) -> int:
+        """增加明石奇遇次数，返回事务提交后的累计值。"""
+        month = month or datetime.now().strftime("%Y-%m")
         with self._stats_transaction() as conn:
             data = self._get_stats_in_connection(conn, instance, month)
             data["akashi_encounters"] = data.get("akashi_encounters", 0) + 1
             self._save_stats_in_connection(conn, instance, month, data)
+            encounters = data["akashi_encounters"]
+        return encounters
 
     def add_akashi_ap_entry(
         self, instance: str, amount: int, base: int, count: int, source: str
@@ -739,20 +550,26 @@ class Cl1Database:
             data["akashi_ap"] = data.get("akashi_ap", 0) + amount
             self._save_stats_in_connection(conn, instance, month, data)
 
-    def add_ap_snapshot(self, instance: str, ap_current: int, source: str = "cl1", distance: int = None, ap_total: int = None):
-        """记录行动力快照（真实剩余体力），并计算资产
+    def add_ap_snapshot(self, instance: str, ap_current: int | None, source: str = "cl1", distance: int = None,
+                        ap_total: int = None, *, observed_at: datetime = None):
+        """记录完整总行动力及资产，或不带行动力的独立海里数。
 
         Args:
             instance: 实例名称
-            ap_current: 当前行动力剩余
+            ap_current: 当前行动力剩余；独立海里数时可为 None
             source: 数据来源标记 (cl1 / meow 等)
             distance: 海里数（可选）
-            ap_total: 总体力（含行动力箱子）
+            ap_total: 本次实测总体力（含行动力箱子），缺失时只允许记录海里数
         """
-        month = datetime.now().strftime("%Y-%m")
+        if ap_total is None and distance is None:
+            return
+        observed_at = observed_at or datetime.now()
+        month = observed_at.strftime("%Y-%m")
         with self._stats_transaction() as conn:
+            # 补齐必须先于本次读取。
+            self.ensure_coins_history(instance, conn)
             data = self._get_stats_in_connection(conn, instance, month)
-            now = datetime.now()
+            now = observed_at
 
             # CL5 效率：1700 / 30 ≈ 56.67
             cl5_efficiency = 1700.0 / 30.0
@@ -764,29 +581,134 @@ class Cl1Database:
                 with suppress(ValueError, TypeError, IndexError, KeyError):
                     yellow_coin = int(yellow_coin_snapshots[-1].get("yellow_coin", 0))
 
-            # 资产按可用总体力计算，包含行动力箱子。
-            ap_current = self._coerce_int(ap_current)
-            if ap_total is not None:
-                ap_total = self._coerce_int(ap_total)
-            ap_for_asset = ap_total if ap_total is not None else ap_current
-            asset = ap_for_asset * cl5_efficiency + yellow_coin
-
             snapshot = {
                 "ts": now.isoformat(),
-                "ap": ap_current,
-                "yellow_coin": yellow_coin,
-                "asset": round(asset, 2),
                 "source": source,
             }
             if distance is not None:
                 snapshot["distance"] = self._coerce_int(distance)
             if ap_total is not None:
-                snapshot["ap_total"] = ap_total
+                # 当前读数不能替代总量，独立海里数也不附带缓存行动力或资产。
+                ap_total = self._coerce_int(ap_total)
+                snapshot.update(ap_total=ap_total, yellow_coin=yellow_coin,
+                                asset=round(ap_total * cl5_efficiency + yellow_coin, 2))
+                if ap_current is not None:
+                    snapshot["ap"] = self._coerce_int(ap_current)
 
             snapshots = data.get("ap_snapshots", [])
             snapshots.append(snapshot)
             data["ap_snapshots"] = snapshots
             self._save_stats_in_connection(conn, instance, month, data)
+
+    def ensure_coins_cleanup(self, instance: str, conn) -> None:
+        """清掉月初残留的紫币读数，按版本号只执行一次。
+
+        早期写入没有跨月比较，游戏尚未刷新前的上月读数会成为当月最初的点，把小轴整体抬高。
+        这里删除各月开头与上月最后一条紫币相同的连续记录，直到数值真正变化为止；
+        整月都没有变化时不删，避免把该月清空。
+
+        Args:
+            instance: 实例名称。
+            conn: 复用的数据库连接。
+        """
+        if instance in self._coins_cleanup_checked:
+            return
+        try:
+            stored: Dict[str, Dict[str, Any]] = {}
+            with self.store.transaction(write=False) as reader:
+                for (month,) in reader.execute(
+                    'select month from cl1_months where instance = ? order by month', (instance,)
+                ):
+                    try:
+                        stored[month] = self._get_stats_in_connection(reader, instance, month)
+                    except (TypeError, ValueError):
+                        logger.warning(f'[统计] 月初紫币清理跳过 {instance} {month}：该月数据无法解析')
+            if any(data.get('coins_cleanup_version') == COINS_CLEANUP_VERSION for data in stored.values()):
+                self._coins_cleanup_checked.add(instance)
+                return
+            previous = None
+            for month in sorted(stored):
+                data = stored[month]
+                snapshots = data.get('coins_snapshots', [])
+                if previous is not None and snapshots:
+                    head = 0
+                    while head < len(snapshots) and snapshots[head].get('purple_coins') == previous:
+                        head += 1
+                    if 0 < head < len(snapshots):
+                        data['coins_snapshots'] = snapshots[head:]
+                        snapshots = data['coins_snapshots']
+                if snapshots:
+                    previous = snapshots[-1].get('purple_coins')
+                data['coins_cleanup_version'] = COINS_CLEANUP_VERSION
+                self._save_stats_in_connection(conn, instance, month, data)
+            self._coins_cleanup_checked.add(instance)
+        except Exception as error:
+            logger.warning(f'[统计] 月初紫币残留清理失败，下次再试: {error}')
+
+    def _get_previous_coins_snapshot(self, conn, instance: str, month: str) -> Optional[Dict[str, Any]]:
+        """取上个月的最后一条凭证快照，用于判断月初读数是否为上月残留。"""
+        try:
+            year, number = (int(part) for part in month.split('-'))
+            previous_month = f'{year - 1:04d}-12' if number == 1 else f'{year:04d}-{number - 1:02d}'
+        except (ValueError, AttributeError):
+            return None
+        snapshots = self._get_stats_in_connection(conn, instance, previous_month).get('coins_snapshots') or []
+        return snapshots[-1] if snapshots else None
+
+    def ensure_coins_history(self, instance: str, conn) -> None:
+        """用资源快照补齐凭证历史，按版本号只执行一次。
+
+        早期实现按 500 条上限丢弃最旧的凭证记录，历史因此只剩几天；资源快照同一读数并无此上限，
+        故首次运行到这里时把缺口补回月度存储，之后凭版本号跳过。
+
+        读写都走合并视图（大世界字段自动读取还原）：只改凭证与版本号两个键，其余键原样写回；
+        密文暂不可读取还原时读取会带下降级标记，写回路径据此保留原密文、不会抹掉同月其它键。
+        整段失败不影响快照写入本身。
+
+        Args:
+            instance: 实例名称。
+            conn: 复用的数据库连接。
+        """
+        if instance in self._coins_history_checked:
+            return
+        try:
+            stored: Dict[str, Dict[str, Any]] = {}
+            with self.store.transaction(write=False) as reader:
+                for (month,) in reader.execute(
+                    'select month from cl1_months where instance = ?', (instance,)
+                ):
+                    try:
+                        stored[month] = self._get_stats_in_connection(reader, instance, month)
+                    except (TypeError, ValueError):
+                        logger.warning(f'[统计] 凭证历史补齐跳过 {instance} {month}：该月数据无法解析')
+            if any(data.get('coins_history_version') == COINS_HISTORY_VERSION for data in stored.values()):
+                self._coins_history_checked.add(instance)
+                return
+            from module.statistics.resource_stats import get_resource_timeline
+            timeline = get_resource_timeline(instance, limit=200000)
+            grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+            for row in timeline:
+                if row.get('yellow_coin') is None and row.get('purple_coin') is None:
+                    continue
+                grouped[str(row['ts'])[:7]].append(row)
+            for month_key, rows in grouped.items():
+                data = stored.get(month_key) or self._empty_data(month_key)
+                snapshots = data.get('coins_snapshots', [])
+                known = {str(item.get('ts')) for item in snapshots}
+                for row in rows:
+                    stamp = str(row['ts'])
+                    if stamp in known:
+                        continue
+                    snapshot = {'ts': stamp, 'yellow_coins': row.get('yellow_coin'), 'source': 'cl1'}
+                    if row.get('purple_coin') is not None:
+                        snapshot['purple_coins'] = row.get('purple_coin')
+                    snapshots.append(snapshot)
+                data['coins_snapshots'] = thin_coins_snapshots(snapshots)
+                data['coins_history_version'] = COINS_HISTORY_VERSION
+                self._save_stats_in_connection(conn, instance, month_key, data)
+            self._coins_history_checked.add(instance)
+        except Exception as error:
+            logger.warning(f'[统计] 凭证历史补齐失败，下次再试: {error}')
 
     def get_last_ap_snapshot(self, instance: str) -> Optional[Dict[str, Any]]:
         """获取最近一次行动力快照，优先读取当前月份，必要时回退到历史月份。"""
@@ -838,7 +760,7 @@ class Cl1Database:
             self._save_stats_in_connection(conn, instance, month, data)
 
     def add_yellow_coin_snapshot(
-        self, instance: str, yellow_coin: int, source: str = "dashboard"
+        self, instance: str, yellow_coin: int, source: str = "dashboard", *, observed_at: datetime = None
     ):
         """记录黄币快照（用于统计页分时叠加曲线）
 
@@ -847,13 +769,14 @@ class Cl1Database:
             yellow_coin: 当前黄币
             source: 数据来源标记
         """
-        month = datetime.now().strftime("%Y-%m")
+        observed_at = observed_at or datetime.now()
+        month = observed_at.strftime("%Y-%m")
         with self._stats_transaction() as conn:
             data = self._get_stats_in_connection(conn, instance, month)
             yellow_coin = self._coerce_int(yellow_coin)
 
             snapshot = {
-                "ts": datetime.now().isoformat(),
+                "ts": observed_at.isoformat(),
                 "yellow_coin": yellow_coin,
                 "source": source,
             }
@@ -873,6 +796,9 @@ class Cl1Database:
         yellow_coins: int,
         purple_coins: int = None,
         source: str = "cl1",
+        *,
+        observed_at: datetime = None,
+        carry_purple: bool = False,
     ):
         """记录凭证快照（作战补给凭证/特别兑换凭证）
 
@@ -882,14 +808,24 @@ class Cl1Database:
             purple_coins: 当前特别兑换凭证（紫币）数量，None 表示不记录（如 hazard 循环不知道真实值）
             source: 数据来源标记 (cl1 / meow 等)
         """
-        month = datetime.now().strftime("%Y-%m")
+        observed_at = observed_at or datetime.now()
+        month = observed_at.strftime("%Y-%m")
         with self._stats_transaction() as conn:
+            # 补齐必须先于本次读取。
+            self.ensure_coins_history(instance, conn)
             data = self._get_stats_in_connection(conn, instance, month)
             yellow_coins = self._coerce_int(yellow_coins)
             purple_coins = self._coerce_int(purple_coins) if purple_coins is not None else None
+            if carry_purple and purple_coins is None:
+                previous = next((point for point in reversed(data.get('coins_snapshots', []))
+                                 if point.get('purple_coins') is not None), None)
+                if previous is None:
+                    previous = self._get_previous_coins_snapshot(conn, instance, month)
+                if previous is not None and previous.get('purple_coins') is not None:
+                    purple_coins = self._coerce_int(previous['purple_coins'])
 
             snapshot = {
-                "ts": datetime.now().isoformat(),
+                "ts": observed_at.isoformat(),
                 "yellow_coins": yellow_coins,
                 "source": source,
             }
@@ -897,6 +833,11 @@ class Cl1Database:
                 snapshot["purple_coins"] = purple_coins
 
             snapshots = data.get("coins_snapshots", [])
+            if not snapshots and purple_coins is not None:
+                # 与上月最后一条相同的月初读数视为残留，不记录。
+                previous = self._get_previous_coins_snapshot(conn, instance, month)
+                if previous is not None and self._coerce_int(previous.get('purple_coins', -1)) == purple_coins:
+                    return
             if snapshots:
                 with suppress(ValueError, TypeError, IndexError, KeyError):
                     last = snapshots[-1]
@@ -909,10 +850,7 @@ class Cl1Database:
                         if purple_coins is None and "purple_coins" not in last:
                             return
             snapshots.append(snapshot)
-            # 保留最近 500 条记录，避免数据过大
-            if len(snapshots) > 500:
-                snapshots = snapshots[-500:]
-            data["coins_snapshots"] = snapshots
+            data["coins_snapshots"] = thin_coins_snapshots(snapshots)
             self._save_stats_in_connection(conn, instance, month, data)
 
     def async_add_coins_snapshot(
@@ -921,100 +859,47 @@ class Cl1Database:
         yellow_coins: int,
         purple_coins: int = None,
         source: str = "cl1",
+        *,
+        observed_at: datetime = None,
+        carry_purple: bool = False,
     ):
         """异步记录凭证快照"""
         from module.base.async_executor import async_executor
 
-        return async_executor.submit(
-            self.add_coins_snapshot, instance, yellow_coins, purple_coins, source
+        future = async_executor.submit(
+            self.add_coins_snapshot, instance, yellow_coins, purple_coins, source,
+            observed_at=observed_at or datetime.now(), carry_purple=carry_purple,
         )
+        future.add_done_callback(self._snapshot_finished)
+        return future
+
+    @staticmethod
+    def _snapshot_finished(future):
+        """后台统计失败必须可见，不能影响主线程的游戏状态。"""
+        if future.cancelled():
+            logger.warning('[统计-快照] 后台写入被取消')
+        elif future.exception() is not None:
+            logger.error(f'[统计-快照] 后台写入失败: {type(future.exception()).__name__}')
 
     def migrate_from_json(self, json_path: Path, instance: str):
-        """从 JSON 文件迁移数据到数据库"""
-        if not json_path.exists():
-            return
+        """显式导入旧月份文件，只补缺月，不修改源文件。"""
+        import re
+        from module.persistence.migration import LegacyDecoder
+        from module.persistence.snapshots import read_month
+        path = Path(json_path).absolute()
+        data = LegacyDecoder(self.store.directory.parent).file('archives', path, path)
+        with self._stats_transaction() as connection:
+            for month in sorted(key for key in data if re.fullmatch(r'\d{4}-\d{2}', key)):
+                if read_month(connection, instance, month) is not None:
+                    continue
+                value = data[month]
+                if not isinstance(value, dict):
+                    record = self._empty_data(month)
+                    record.update(battle_count=value, akashi_encounters=data.get(month + '-akashi', 0),
+                                  akashi_ap=data.get(month + '-akashi-ap', 0), akashi_ap_entries=data.get(month + '-akashi-ap-entries', []))
+                    value = record
+                self._save_stats_in_connection(connection, instance, month, value)
 
-        logger.info(f"[Statistics] 开始从 JSON 迁移 CL1 数据: {json_path}, instance={instance}")
-        try:
-            with json_path.open("r", encoding="utf-8") as f:
-                old_data = json.load(f)
-
-            if not isinstance(old_data, dict):
-                return
-
-            # JSON 格式比较杂乱，需要按月份归档
-            # 格式可能是: {"2026-02": 10, "2026-02-akashi": 1, "2026-02-akashi-ap": 120, "2026-02-akashi-ap-entries": [...]}
-            months = {
-                key[:7]
-                for key in old_data
-                if len(key) >= 7 and key[4] == "-"
-            }
-
-            for month in months:
-                # 首先检查数据库是否已有数据，避免覆盖
-                with self._stats_transaction() as conn:
-                    c = conn.cursor()
-                    c.execute(
-                        "SELECT 1 FROM cl1_data WHERE instance = ? AND month = ?",
-                        (instance, month),
-                    )
-                    if c.fetchone():
-                        logger.info(
-                            f"[Statistics] 数据库中已存在 {instance} {month}，跳过迁移"
-                        )
-                        continue
-
-                    new_stats = self._empty_data(month)
-                    new_stats["battle_count"] = old_data.get(month, 0)
-                    new_stats["akashi_encounters"] = old_data.get(f"{month}-akashi", 0)
-                    new_stats["akashi_ap"] = old_data.get(f"{month}-akashi-ap", 0)
-                    new_stats["akashi_ap_entries"] = old_data.get(
-                        f"{month}-akashi-ap-entries", []
-                    )
-
-                    self._save_stats_in_connection(conn, instance, month, new_stats)
-                logger.info(f"[Statistics] 已迁移 {instance} {month}")
-
-            # 迁移成功后可以删除 JSON 或重命名 (此处建议重命名为 .bak 以防万一)
-            bak_path = json_path.with_suffix(".json.bak")
-            json_path.replace(bak_path)
-            logger.info(f"[Statistics] 已将旧 JSON 重命名为 {bak_path}")
-
-        except Exception as e:
-            logger.exception(f"从 JSON 迁移 CL1 数据失败: {e}")
-
-    def _auto_migrate(self):
-        """
-        初始化时自动扫描 log/cl1 下的所有实例并迁移旧数据
-        """
-        project_root = Path(__file__).resolve().parents[2]
-        old_db_dir = project_root / "log" / "cl1"
-        old_db_path = old_db_dir / "cl1_data.db"
-
-        if old_db_path.exists() and not self.db_path.exists():
-            import shutil
-
-            try:
-                shutil.move(str(old_db_path), str(self.db_path))
-                logger.info(
-                    f"Moved old CL1数据库 from {old_db_path} to {self.db_path}"
-                )
-            except Exception as e:
-                logger.error(f"[统计-数据库] 移动旧CL1数据库失败: {e}")
-
-        if not old_db_dir.exists():
-            return
-
-        # logger.info(f"在 {old_db_dir} 中扫描旧版 CL1 数据...")
-        try:
-            for instance_dir in old_db_dir.iterdir():
-                if instance_dir.is_dir():
-                    json_file = instance_dir / "cl1_monthly.json"
-                    if json_file.exists():
-                        # logger.info(f"发现实例旧数据: {instance_dir.name}")
-                        self.migrate_from_json(json_file, instance_dir.name)
-        except Exception as e:
-            logger.error(f"[统计-数据库] 自动迁移扫描错误: {e}")
 
     # ========== 耄耋相接数据记录方法 ==========
 
@@ -1147,25 +1032,30 @@ class Cl1Database:
 
             self._save_stats_in_connection(conn, instance, month, data)
 
-    def increment_meow_akashi_encounter(self, instance: str, hazard_level: int):
-        """记录一次耄耋相接明石事件（按侵蚀等级拆分）。
+    def increment_meow_akashi_encounter(
+        self, instance: str, hazard_level: int, month: Optional[str] = None,
+    ) -> Optional[int]:
+        """提交一次耄耋相接明石事件，返回该侵蚀等级的实际累计次数。
 
         Args:
             instance: 实例名称
             hazard_level: 侵蚀等级（2-6）
+            month: 事件发生月份；不传时使用当前月份。
         """
         if hazard_level not in {2, 3, 4, 5, 6}:
             logger.debug(f"Invalid hazard_level {hazard_level}, ignoring")
             return
 
-        month = datetime.now().strftime("%Y-%m")
+        month = month or datetime.now().strftime("%Y-%m")
         with self._stats_transaction() as conn:
             data = self._get_stats_in_connection(conn, instance, month)
             hazard_stats = self._normalize_meow_hazard_stats(data)
             bucket = self._ensure_meow_hazard_bucket(hazard_stats, hazard_level)
             bucket["akashi_encounters"] = bucket.get("akashi_encounters", 0) + 1
+            count = bucket["akashi_encounters"]
             data["meow_hazard_stats"] = hazard_stats
             self._save_stats_in_connection(conn, instance, month, data)
+        return count
 
     def add_meow_akashi_ap(self, instance: str, hazard_level: int, amount: int):
         """记录耄耋相接明石商店购买的体力（按侵蚀等级拆分）。
@@ -1216,23 +1106,18 @@ class Cl1Database:
             month = now.month
         key = f"{year:04d}-{month:02d}"
 
-        with self._stats_transaction() as conn:
-            data = self._get_stats_in_connection(conn, instance, key)
+        data = self.get_stats(instance, key)
+        round_times = data.get("meow_round_times", [])
+        battle_times = data.get("meow_battle_times", [])
+        normalized_round_times = self._normalize_meow_round_times(round_times)
 
-            round_times = data.get("meow_round_times", [])
-            battle_times = data.get("meow_battle_times", [])
-            normalized_round_times = self._normalize_meow_round_times(round_times)
-
-            effective_rounds = float(data.get("meow_battle_count", 0) or 0)
-            battle_count, effective_rounds, changed = self._reconcile_meow_counts(
-                data=data,
-                effective_rounds=effective_rounds,
-                round_times=round_times,
-                battle_times=battle_times,
-            )
-
-            if changed:
-                self._save_stats_in_connection(conn, instance, key, data)
+        effective_rounds = float(data.get("meow_battle_count", 0) or 0)
+        battle_count, effective_rounds, _ = self._reconcile_meow_counts(
+            data=data,
+            effective_rounds=effective_rounds,
+            round_times=round_times,
+            battle_times=battle_times,
+        )
 
         round_durations = [entry["duration"] for entry in normalized_round_times]
 
@@ -1398,11 +1283,11 @@ class Cl1Database:
 
         return async_executor.submit(self.increment_battle_count, instance, delta)
 
-    def async_increment_akashi_encounter(self, instance: str):
+    def async_increment_akashi_encounter(self, instance: str, month: Optional[str] = None):
         """异步增加明石遭遇次数。"""
         from module.base.async_executor import async_executor
 
-        return async_executor.submit(self.increment_akashi_encounter, instance)
+        return async_executor.submit(self.increment_akashi_encounter, instance, month)
 
     def async_add_akashi_ap_entry(
         self, instance: str, amount: int, base: int, count: int, source: str
@@ -1415,12 +1300,16 @@ class Cl1Database:
         )
 
     def async_add_ap_snapshot(
-        self, instance: str, ap_current: int, source: str = "cl1", distance: int = None, ap_total: int = None
+        self, instance: str, ap_current: int | None, source: str = "cl1", distance: int = None, ap_total: int = None,
+        *, observed_at: datetime = None,
     ):
         """异步添加行动力快照。"""
         from module.base.async_executor import async_executor
 
-        return async_executor.submit(self.add_ap_snapshot, instance, ap_current, source, distance, ap_total)
+        future = async_executor.submit(self.add_ap_snapshot, instance, ap_current, source, distance, ap_total,
+                                       observed_at=observed_at or datetime.now())
+        future.add_done_callback(self._snapshot_finished)
+        return future
 
     def async_set_last_ap_notification(self, instance: str, ap_current: int):
         """异步记录最近一次行动力通知值。"""
@@ -1431,14 +1320,17 @@ class Cl1Database:
         )
 
     def async_add_yellow_coin_snapshot(
-        self, instance: str, yellow_coin: int, source: str = "dashboard"
+        self, instance: str, yellow_coin: int, source: str = "dashboard", *, observed_at: datetime = None
     ):
         """异步记录代币快照。"""
         from module.base.async_executor import async_executor
 
-        return async_executor.submit(
-            self.add_yellow_coin_snapshot, instance, yellow_coin, source
+        future = async_executor.submit(
+            self.add_yellow_coin_snapshot, instance, yellow_coin, source,
+            observed_at=observed_at or datetime.now(),
         )
+        future.add_done_callback(self._snapshot_finished)
+        return future
 
     def async_increment_meow_battle_count(
         self, instance: str, hazard_level: int = None, delta: float = None
@@ -1486,12 +1378,14 @@ class Cl1Database:
             self.add_siren_research_device, instance, source, hazard_level
         )
 
-    def async_increment_meow_akashi_encounter(self, instance: str, hazard_level: int):
+    def async_increment_meow_akashi_encounter(
+        self, instance: str, hazard_level: int, month: Optional[str] = None,
+    ):
         """异步增加短猫相接明石遭遇计数。"""
         from module.base.async_executor import async_executor
 
         return async_executor.submit(
-            self.increment_meow_akashi_encounter, instance, hazard_level
+            self.increment_meow_akashi_encounter, instance, hazard_level, month
         )
 
     def async_add_meow_akashi_ap(self, instance: str, hazard_level: int, amount: int):

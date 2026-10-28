@@ -1,7 +1,7 @@
 [project]
 name = "azurpilot"
-version = "0.0.0"
-requires-python = ">=3.14.6,<3.15"
+version = "1.0.0"
+requires-python = ">=3.14.6,<3.14.14"
 dependencies = [
     "numpy==2.4.6",
     "scipy==1.18.0",
@@ -9,8 +9,8 @@ dependencies = [
     "opencv-python==5.0.0.93",
     "imageio==2.26.0",
     "imageio-ffmpeg==0.6.0",
-    "adbutils==1.2.3",
-    "uiautomator2==2.16.26",
+    "adbutils==0.11.0",
+    "uiautomator2==2.16.17",
     "uiautomator2cache==0.3.0.1",
     "jellyfish==1.2.1",
     "pyyaml==6.0.3",
@@ -37,13 +37,17 @@ dependencies = [
     "onnxruntime==1.27.0; sys_platform == 'linux'",
     "onnxruntime==1.27.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "numba==0.66.0",
-    "uv==0.11.32",
+    "uv==0.13.5",
     "lz4==4.4.5",
     "packaging==24.2",
     "openai==2.30.0",
     "mcp==1.23.0",
-    "luaparser==4.2.0",
     "textual>=0.80.0",
+    "cryptography>=49.0.0",
+    "keyring>=25.6.0",
+    "portalocker>=3.2.0",
+    "openpyxl>=3.1.5,<4",
+    "pyflared==0.1.0",
 ]
 
 [dependency-groups]
@@ -57,6 +61,8 @@ dev = [
 ]
 
 [tool.uv]
+# 直接运行与启动器使用同一个项目缓存，避免依赖 Windows 全局缓存的权限。
+cache-dir = ".uv-cache"
 index = [
     # 云厂商镜像
     { url = "https://mirrors.aliyun.com/pypi/simple/" },

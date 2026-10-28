@@ -266,6 +266,7 @@ S9-DR0.5 > S9-Q1 > 0.5 > reset > S9-E-315 > G1.5 > shortest
 
 - 日志前缀 `[科研-*]`：`logger.attr('科研项目', ...)` 输出识别结果，`过滤排序` 输出过滤器命中顺序，`科研队列` 输出 5 个槽位状态数组；调度时长看 `task_delay` 日志。
 - 离线识别验证：对已有截图直接调用 `module.research.project` 的 `research_detect(image)`（CN/EN/TW）或 `research_jp_detect(image)`（JP）；注意先设置 `module.config.server.server` 再导入游戏模块，避免资源按错误服务器加载。
+- 科研刷新检测：`research_reset()` 对 `RESET_AVAILABLE` 使用固定区域颜色检测（`threshold=10`），检测与点击范围由 `assets/<server>/research/RESET_AVAILABLE.png` 生成。国服取“点击刷新”文字区 `(1193, 662, 1267, 679)`；界面位置变化时，从新截图提取文字区，保留 1280×720 画布并将区域外像素置黑，再运行 `uv run -m dev_tools.button_extract` 同步坐标与颜色。
 - 过滤器问题先用 `FILTER_REGEX` 手动匹配调试（`module/research/selector.py` 顶部），再确认预设键名与 `argument.yaml` 选项一致。
 - T 类流程异常先查 `Research_RemainingCommissions` 的当前值：-1/0/正数分别对应无挂起、可入队、等委托三种状态，委托侧扣减逻辑见 `module/commission` 的 `_handle_research_genre_t_update`。
 
@@ -278,3 +279,6 @@ S9-DR0.5 > S9-Q1 > 0.5 > reset > S9-E-315 > G1.5 > shortest
 - [OCR 系统](../ocr.md) —— 项目名 OCR 与 `Duration` 时长识别。
 - [基础层 module/base](../base/index.md) —— `Filter` 优先级串引擎、`Config` 服务器分发装饰器。
 - [商店系统](shop.md) —— 同样基于 `Filter` 优先级串的选品模式，可对照理解过滤器语言。
+### 资源收支记录
+
+科研项目确实启动、正向检测到 `RESEARCH_STOP` 且本轮执行过启动操作后，按项目目录明确数量记录物资、魔方与心智单元支出；已经运行的项目不重复扣账。完成奖励使用任务已有画面的已知模板与数量旁路记录。未知用量不推测，详细规则见 [资源管理](../webui/resource-management.md)。

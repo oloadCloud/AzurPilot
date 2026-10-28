@@ -20,6 +20,54 @@ def increment(path, count):
 
 
 class ConfigTransactionTests(unittest.TestCase):
+    def test_exploration_clear_resets_own_checkpoint_and_preserves_purchase_record(self):
+        from module.api.config_service import ConfigService
+        from module.api.protocol import ConfigChange
+        from tests.test_api import fixture
+
+        for mode in ('monthly', 'smart'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                service = ConfigService(fixture(directory))
+                data = service.get('testpilot')['values']
+                monthly = data['OpsiExplore']['OpsiExplore']
+                monthly.update(ExploreProgress='已完成百分之100.00', LastZone=121,
+                               MeowfficerCleanupState={'reset': '2026-11-01T00:00:00', 'phase': 'done'})
+                scheduling = data['OpsiScheduling']
+                scheduling['OpsiSmartExplore']['Progress'] = '已开荒 34/72，阶段：开荒'
+                scheduling['Storage']['Storage'] = {'SmartExplore': {'next': [30, 7, 0]},
+                                                     'ActionPointPurchase': {'phase': 'done'}, 'Unrelated': 12}
+                service.path('testpilot').write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+                before = copy.deepcopy(data)
+                path = ('OpsiExplore.OpsiExplore.ExploreProgress' if mode == 'monthly'
+                        else 'OpsiScheduling.OpsiSmartExplore.Progress')
+                result = service.patch('testpilot', None, [ConfigChange(path=path, value='')])['values']
+                if mode == 'monthly':
+                    expected = before['OpsiExplore']['OpsiExplore']
+                    expected.update(ExploreProgress='', LastZone=0, MeowfficerCleanupState=None)
+                else:
+                    before['OpsiScheduling']['OpsiSmartExplore']['Progress'] = ''
+                    before['OpsiScheduling']['Storage']['Storage'].pop('SmartExplore')
+                self.assertEqual(result, before)
+
+    def test_exploration_progress_only_allows_empty_text_and_clear_is_atomic(self):
+        from module.api.config_service import ConfigService
+        from module.api.protocol import ApiError, ConfigChange
+        from tests.test_api import fixture
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = ConfigService(fixture(directory))
+            for path in ('OpsiExplore.OpsiExplore.ExploreProgress', 'OpsiScheduling.OpsiSmartExplore.Progress'):
+                for value in ('fake 100%', None, False, {}, []):
+                    with self.subTest(path=path, value=value), self.assertRaises(ApiError):
+                        service.patch('testpilot', None, [ConfigChange(path=path, value=value)])
+            original = service.path('testpilot').read_bytes()
+            with self.assertRaises(ApiError):
+                service.patch('testpilot', None, [
+                    ConfigChange(path='OpsiExplore.OpsiExplore.ExploreProgress', value=''),
+                    ConfigChange(path='OpsiExplore.OpsiExplore.MeowfficerCleanupState', value=None),
+                ])
+            self.assertEqual(service.path('testpilot').read_bytes(), original)
+
     def test_stale_worker_cannot_undo_same_field_edit(self):
         from module.config.config import AzurLaneConfig
         from module.api.config_service import ConfigService
@@ -116,7 +164,7 @@ class ConfigTransactionTests(unittest.TestCase):
             ])
             emotion = service.get('testpilot')['values']['Main']['Emotion']
             self.assertEqual(85, emotion['Fleet1Value'])
-            elapsed = datetime.now() - datetime.strptime(emotion['Fleet1Record'], '%Y-%m-%d %H:%M:%S')
+            elapsed = datetime.now() - datetime.fromisoformat(emotion['Fleet1Record'])
             self.assertLess(elapsed.total_seconds(), 30,
                             f"Fleet1Record 未随 Fleet1Value 刷新：{emotion['Fleet1Record']}")
 
@@ -131,6 +179,7 @@ class ConfigTransactionTests(unittest.TestCase):
         from module.api.config_service import ConfigService
         from module.api.protocol import ConfigChange
         from module.combat.emotion import FleetEmotion
+        from module.exception import RequestHumanTakeover
         from module.config.config import AzurLaneConfig
         from tests.test_api import fixture
 
@@ -154,9 +203,8 @@ class ConfigTransactionTests(unittest.TestCase):
             data['Main']['Emotion']['Fleet1Record'] = '2020-01-01 00:00:00'
             path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
             stale = FleetEmotion(build(path), '1')
-            stale.current = 85
-            stale.update()
-            self.assertGreater(stale.current - 85, 20, '时间戳陈旧时应当重复计入恢复量，否则测试前提不成立')
+            with self.assertRaises(RequestHumanTakeover):
+                stale.update()
 
             service.patch('testpilot', None, [
                 ConfigChange(path='Main.Emotion.Fleet1Value', value=85),
@@ -166,6 +214,82 @@ class ConfigTransactionTests(unittest.TestCase):
             refreshed.update()
             self.assertLessEqual(refreshed.current - 85, 1,
                                  f'改值后仍重复计入恢复量，current={refreshed.current}')
+
+    def test_emotion_calibration_uses_final_settings_and_invalidates_after_change(self):
+        from module.api.config_service import ConfigService
+        from module.api.protocol import ConfigChange, ApiError
+        from tests.test_api import fixture
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = ConfigService(fixture(directory))
+            changes = [ConfigChange(path='Main.Emotion.Fleet1Value', value=85),
+                       ConfigChange(path='Main.Emotion.Fleet1Oath', value=True),
+                       ConfigChange(path='Main.Emotion.Fleet1Recover', value='dormitory_floor_2')]
+            fields = service.patch('testpilot', None, changes)['values']['Main']['Emotion']
+            self.assertEqual(['dormitory_floor_2', True, False], fields['Fleet1RecoveryState']['signature'])
+            self.assertEqual([[0, 360_000_000, 85]], fields['Fleet1RecoveryState']['segments'])
+            service.patch('testpilot', None, [ConfigChange(path='Main.Emotion.Fleet1Oath', value=False)])
+            self.assertIsNone(service.read('testpilot')[0]['Main']['Emotion']['Fleet1RecoveryState'])
+            for value in (-1, 151, True, 85.5):
+                with self.subTest(value=value), self.assertRaises(ApiError):
+                    service.patch('testpilot', None, [ConfigChange(path='Main.Emotion.Fleet1Value', value=value)])
+            with self.assertRaises(ApiError):
+                service.patch('testpilot', None, [ConfigChange(path='Main.Emotion.Fleet1RecoveryState', value={})])
+
+    def test_same_value_calibration_cannot_be_overwritten_by_stale_worker(self):
+        from module.api.config_service import ConfigService
+        from module.api.protocol import ConfigChange
+        from module.config.config import AzurLaneConfig
+        from tests.test_api import fixture
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = ConfigService(fixture(directory))
+            worker = AzurLaneConfig.__new__(AzurLaneConfig)
+            worker.config_name = 'testpilot'
+            path = str(service.path('testpilot'))
+            with patch('module.config.config.filepath_config', return_value=path), patch(
+                'module.config.config_updater.filepath_config', return_value=path
+            ), patch.object(AzurLaneConfig, 'config_override'):
+                worker.data = worker.config_update(service.read('testpilot')[0])
+                worker._loaded_data = copy.deepcopy(worker.data)
+                worker.modified, worker.bound, worker.overridden = {}, {}, {}
+                worker.auto_update = False
+                worker.bind('Main')
+                original = worker.Emotion_Fleet1Value
+                expected = service.patch('testpilot', None, [
+                    ConfigChange(path='Main.Emotion.Fleet1Value', value=original)
+                ])['values']['Main']['Emotion']
+                worker.Emotion_Fleet1Value = original - 2
+                worker.Emotion_Fleet1Record = worker.Emotion_Fleet1Record
+                worker.Emotion_Fleet1RecoveryState = None
+                worker.save()
+                self.assertEqual(expected, service.read('testpilot')[0]['Main']['Emotion'])
+
+    def test_public_emotion_calibration_is_atomic_and_same_value_can_recalibrate(self):
+        from datetime import datetime, timedelta
+        from module.api.config_service import ConfigService
+        from module.api.protocol import ConfigChange
+        from tests.test_api import fixture
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = ConfigService(fixture(directory))
+            now = datetime(2026, 10, 9, microsecond=123456)
+            with patch('module.api.config_service.current_time', return_value=now):
+                fields = service.patch('testpilot', None, [
+                    ConfigChange(path='General.PublicEmotion.FleetValue', value=85),
+                    ConfigChange(path='General.PublicEmotion.FleetRecover', value='dormitory_floor_1'),
+                    ConfigChange(path='General.PublicEmotion.FleetOath', value=True),
+                ])['values']['General']['PublicEmotion']
+            self.assertEqual(['dormitory_floor_1', True, False], fields['FleetRecoveryState']['signature'])
+            self.assertEqual(now, datetime.fromisoformat(fields['FleetRecord']))
+            self.assertEqual(now, datetime.fromisoformat(fields['FleetRecoveryState']['record']))
+            now += timedelta(microseconds=1)
+            with patch('module.api.config_service.current_time', return_value=now):
+                fields = service.patch('testpilot', None, [
+                    ConfigChange(path='General.PublicEmotion.FleetValue', value=85)
+                ])['values']['General']['PublicEmotion']
+            self.assertEqual(now, datetime.fromisoformat(fields['FleetRecord']))
+            self.assertEqual([[0, 360_000_000, 85]], fields['FleetRecoveryState']['segments'])
 
 if __name__ == '__main__':
     unittest.main()

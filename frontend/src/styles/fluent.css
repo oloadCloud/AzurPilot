@@ -24,8 +24,10 @@
   --theme-glass-blur: 30px;
   --theme-glass-saturation: 120%;
   --theme-material-filter: blur(30px) saturate(120%);
+  --theme-inset-filter: none;
   --theme-plate-filter: none;
   --theme-overlay-filter: none;
+  --theme-control-filter: none;
 
   /* 基础色板 */
   color-scheme: dark;
@@ -42,6 +44,8 @@
   --secondary-soft: #60cdff1a;
   --sidebar: var(--surface);
   --radius: 0px;
+  --theme-plate-radius: 0px;
+  --theme-surface-radius: 0px;
   --shadow: var(--glass-shadow);
   --red: #f1707b;
   --green: #6ed585;
@@ -88,7 +92,7 @@
   --theme-primary-hover: var(--accent-hover);
 
   /* 契约层 —— 表单 */
-  --theme-input-bg: var(--glass-muted);
+  --theme-input-bg: #16161652;
   --theme-input-text: var(--text);
   --theme-input-border: #ffffff14;
   --theme-focus: var(--accent);
@@ -246,6 +250,7 @@
 :root[data-theme='fluent'] .primary-nav a,
 :root[data-theme='fluent'] .task-group-button,
 :root[data-theme='fluent'] .nav-search,
+:root[data-theme='fluent'] .nav-handle,
 :root[data-theme='fluent'] .group-nav,
 :root[data-theme='fluent'] .group-nav a,
 :root[data-theme='fluent'] .icon-button,
@@ -307,7 +312,7 @@
 /* ── 紧凑骨架与留白（桌面 ≥950px 生效；窄屏保留 44px 触摸目标）── */
 
 :root[data-theme='fluent'] .app-shell {gap: 0; min-height: var(--viewport-height); align-items: stretch}
-:root[data-theme='fluent'] .main-shell {min-height: calc(var(--viewport-height) - var(--topbar-height))}
+:root[data-theme='fluent'] .main-shell {flex: 1; min-height: calc(var(--viewport-height) - var(--topbar-height))}
 :root[data-theme='fluent'] main {max-height: calc(var(--viewport-height) - var(--topbar-height)); overflow-y: auto}
 
 :root[data-theme='fluent'] .config-side {
@@ -334,13 +339,14 @@
   :root[data-theme='fluent'] .sidebar-footer {padding: 8px 6px}
 
   /* 右栏 */
+  :root[data-theme='fluent'] .app-shell.with-rail {display: flex}
   :root[data-theme='fluent'] .right-rail {top: var(--topbar-height); height: calc(var(--viewport-height) - var(--topbar-height))}
   :root[data-theme='fluent'] .scheduler-widget {margin: 8px 8px 6px; padding: 8px}
   :root[data-theme='fluent'] .scheduler-widget-heading {margin-bottom: 6px}
   :root[data-theme='fluent'] .scheduler-stats {gap: 4px; margin-bottom: 6px}
   :root[data-theme='fluent'] .scheduler-stats > div {padding: 5px 6px}
   :root[data-theme='fluent'] .scheduler-stats strong {font-size: 13px}
-  :root[data-theme='fluent'] .rail-schedule {margin: 0 6px 6px; padding: 7px 2px 2px}
+  :root[data-theme='fluent'] .rail-schedule {background: none; margin: 0 6px 6px; padding: 7px 2px 2px}
   :root[data-theme='fluent'] .rail-section-heading {margin-bottom: 4px}
   :root[data-theme='fluent'] .rail-task-list {gap: 4px}
   :root[data-theme='fluent'] .rail-task-item {min-height: 32px; margin: 0; padding: 4px}
@@ -361,7 +367,7 @@
   :root[data-theme='fluent'] .page-title {margin-bottom: 8px; gap: 12px; min-height: 0; align-items: flex-start}
   :root[data-theme='fluent'] .field-row {padding: 10px 16px; gap: 16px}
   :root[data-theme='fluent'] .group-nav a {padding: 4px 6px}
-  :root[data-theme='fluent'] .group-nav a:hover {border: 1px solid var(--accent-hover)}
+  :root[data-theme='fluent'] .group-nav a:hover {box-shadow: none; border: 1px solid var(--accent-hover)}
   :root[data-theme='fluent'] .config-group {margin-top: 16px}
 
   /* 顶栏 */
@@ -373,9 +379,9 @@
 /* ── 高度对齐 ── */
 
 :root[data-theme='fluent'] .overview-page {
-  height: calc(var(--viewport-height) - var(--topbar-height) - 16px);
+  height: calc(var(--viewport-height) - var(--topbar-height) - 8px);
   min-height: 0;
-  margin: 8px -24px -24px;
+  margin: 8px -24px -32px;
   width: calc(100% + 48px);
 }
 :root[data-theme='fluent'] .overview-page::after {display: none}
@@ -427,6 +433,23 @@
 :root[data-theme='fluent'] button.toggle[aria-checked="true"] {background: var(--accent); border-color: var(--secondary)}
 :root[data-theme='fluent'] button.toggle.on > span,
 :root[data-theme='fluent'] button.toggle[aria-checked="true"] > span {transform: translateX(22px)}
+
+/* ── 去除高光线 ── */
+
+:root[data-theme='fluent'] {
+  & .button.primary,
+  & .button.secondary,
+  & .statistics-inline-control,
+  & .button.danger {box-shadow: var(--theme-control-shadow, none)}
+  & .button.primary:hover,
+  & .button.secondary:hover,
+  & .button.danger:hover {box-shadow: var(--theme-control-shadow-hover, none)}
+  & .panel::before,
+  & .resource-card::before,
+  & .instance-card::before,
+  & .stat-metric-card::before,
+  & .plate::before {box-shadow: none}
+}
 
 /* ── 窄屏（＜950px）：恢复触摸目标，骨架回到单列抽屉 ── */
 

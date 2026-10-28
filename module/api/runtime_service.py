@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 from rich.console import Console
 
 from module.api.protocol import ApiError
+from module.config.server import to_server
+from module.persistence.database import configured_database, get_database
+from module.logger import logger
 from module.runtime.process_manager import ProcessManager
 
 STATES = {1: 'running', 2: 'stopped', 3: 'error', 4: 'updating'}
@@ -79,7 +82,37 @@ class RuntimeService:
         self.configs = configs
         self.logs_cache = {}
         self.lock = threading.RLock()
+        self.database = get_database(getattr(configs, 'directory', None))
+        # 入口迁移完成后才回填；首次采集同样会检查版本标记。
+        if hasattr(configs, 'names') and self.database.path.is_file():
+            from module.statistics.cl1_database import Cl1Database
+            cl1_db = Cl1Database(store=self.database)
+            for name in configs.names():
+                try:
+                    with cl1_db._stats_transaction() as conn:
+                        cl1_db.ensure_coins_history(name, conn)
+                        cl1_db.ensure_coins_cleanup(name, conn)
+                except Exception as exc:
+                    # 回填属于辅助操作；单个实例损坏或锁超时不能阻断整个 WebUI。
+                    logger.warning(f'实例 {name} 物资历史回填失败，已跳过：{exc}')
 
+    def _record_running_now(self) -> None:
+        """把当前的运行集合立刻落盘。
+
+        启停即写，不再只在退出时写一次：这样即使之后进程被直接杀掉，记忆里也已经
+        是杀掉之前的状态，不会退回更早的一次记录。
+
+        """
+        try:
+            running = ProcessManager.running_instances()
+        except Exception:
+            logger.exception('无法枚举运行实例，运行状态未记录')
+            return
+        try:
+            from module.runtime.startup_memory import record_running
+            record_running(instance.config_name for instance in running)
+        except Exception:
+            logger.exception('记录运行状态失败，记忆运行可能不准确')
     def manager(self, instance: str) -> ProcessManager:
         """获取指定实例的进程管理器。
 
@@ -96,18 +129,23 @@ class RuntimeService:
         """获取所有配置实例的状态列表。
 
         Returns:
-            list[dict]: 包含实例名、运行状态、当前任务、模拟器序列号及服务器信息的列表。
+            list[dict]: 包含实例名、运行状态、当前任务、模拟器序列号、服务器检测配置及游戏地区的列表。
         """
         result = []
         for name in self.configs.names():
             data, _ = self.configs.read(name)
             emulator = data.get('Alas', {}).get('Emulator', {})
+            package = emulator.get('PackageName', 'auto')
+            # ServerName 仅用于开服检测；自动包名的地区要等设备检测后才能确定。
+            region = to_server(package) if package and package != 'auto' else None
             manager = ProcessManager._processes.get(name)
             result.append({'name': name, 'status': STATES.get(manager.state, 'stopped') if manager else 'stopped',
                            'currentTask': getattr(manager, 'current_task', None) if manager and manager.state == 1 else None,
-                           'serial': emulator.get('Serial', 'auto'), 'server': emulator.get('ServerName', 'cn')})
+                           'serial': emulator.get('Serial', 'auto'), 'server': emulator.get('ServerName', 'cn'),
+                           'region': region})
         return result
 
+    @configured_database
     def overview(self, instance: str) -> dict:
         """获取指定实例的总览信息。
 
@@ -126,6 +164,9 @@ class RuntimeService:
         now = current_time().isoformat(sep=' ')
         running = getattr(manager, 'current_task', None) if manager and manager.state == 1 else None
         for task, groups in data.items():
+            # 根节点也包含实例身份等内部元数据，只有参数组字典才属于任务。
+            if not isinstance(groups, dict):
+                continue
             scheduler = groups.get('Scheduler', {})
             if scheduler.get('Enable') or task == running:
                 next_run = str(scheduler.get('NextRun', ''))
@@ -172,6 +213,7 @@ class RuntimeService:
             manager.start(task or 'alas', ev=updater.event)
             if not manager.alive:
                 raise ApiError('START_FAILED', '任务未启动，请检查服务是否正在重启')
+        self._record_running_now()
         return self.overview(instance)
 
     def stop(self, instance: str) -> dict:
@@ -189,6 +231,7 @@ class RuntimeService:
         with ProcessManager._get_lifecycle_lock(instance):
             if not self.manager(instance).stop_by_user():
                 raise ApiError('STOP_FAILED', '尚未确认全部工作进程停止，请检查日志后重试')
+        self._record_running_now()
         return self.overview(instance)
 
     def logs(self, instance: str, after: int = 0) -> dict:
@@ -245,6 +288,7 @@ class RuntimeService:
         from module.runtime.preview import hub
         return hub.get(instance)
 
+    @configured_database
     def statistics(self, instance: str, days: int, resource: str) -> dict:
         """获取指定时间范围内的资源趋势历史数据。
 
@@ -260,7 +304,9 @@ class RuntimeService:
         from module.statistics.resource_stats import get_resource_timeline, RESOURCE_COLUMNS
         key = RESOURCE_COLUMNS[resource]
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(sep=' ')
-        rows = get_resource_timeline(instance=instance, limit=5000)
+        # 只有大世界货币需要解密密文列，其余资源跳过。
+        rows = get_resource_timeline(instance=instance, limit=5000,
+                                     include_opsi=resource in ('ActionPoint', 'YellowCoin', 'PurpleCoin'))
         points = [{'time': row['ts'], 'value': row.get(key)} for row in rows
                   if str(row['ts']).replace('T', ' ') >= cutoff and row.get(key) is not None]
         return {'instance': instance, 'resource': resource, 'points': points,

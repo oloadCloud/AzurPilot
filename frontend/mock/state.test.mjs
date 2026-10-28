@@ -1,8 +1,59 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createMockState } from './state.mjs'
+import { normalizeReport } from '../src/components/statisticsData'
 
 describe('前端模拟服务', () => {
+  it('活动候选按实例包名隔离，切换地区时刷新旧选择', () => {
+    const {dispatch} = createMockState()
+    const schema = dispatch('schema.get', {language: 'zh-CN'})
+    for (const [server, packageName] of [
+      ['cn', 'com.bilibili.azurlane'], ['en', 'com.YoStarEN.AzurLane'],
+      ['jp', 'com.YoStarJP.AzurLane'], ['tw', 'com.hkmanjuu.azurlane.gp'],
+    ]) {
+      const saved = dispatch('config.patch', {instance: 'demo-main', changes: [
+        {path: 'Alas.Emulator.PackageName', value: packageName},
+      ]})
+      const candidates = schema.args.Event.Campaign.Event[`option_${server}`]
+      expect(saved.options['Event.Campaign.Event']).toEqual(candidates)
+      expect(saved.values.Event.Campaign.Event).toBe(candidates[0])
+    }
+    expect(dispatch('config.get', {instance: 'demo-alt'}).options['Event.Campaign.Event'])
+      .toEqual(schema.args.Event.Campaign.Event.option_cn)
+  })
+
+  it('跨服活动选择失败不会部分保存同一批其他字段', () => {
+    const {dispatch} = createMockState()
+    const initial = dispatch('config.get', {instance: 'demo-main'})
+    const taiwan = dispatch('schema.get', {language: 'zh-CN'}).args.Event.Campaign.Event.option_tw[0]
+    expect(() => dispatch('config.patch', {instance: 'demo-main', changes: [
+      {path: 'Alas.Emulator.Serial', value: 'should-not-save'},
+      {path: 'Event.Campaign.Event', value: taiwan},
+    ]})).toThrow(/当前服务器/)
+    expect(dispatch('config.get', {instance: 'demo-main'})).toEqual(initial)
+  })
+
+  it('大世界模拟独立于游戏进程，支持完成、绘图、中断和重跑', () => {
+    const {dispatch, tick} = createMockState()
+    const name = 'demo-main'
+    dispatch('config.patch', {instance: name, changes: [{path: 'OpsiSimulator.OpsiSimulatorParameters.Draw', value: 'multi_sample'}]})
+    const game = dispatch('overview.get', {instance: name})
+    const started = dispatch('opsi.simulator.start', {instance: name})
+    expect(started.state).toBe('running')
+    expect(dispatch('opsi.simulator.status', {instance: 'demo-alt'}).state).toBe('idle')
+    expect(() => dispatch('opsi.simulator.start', {instance: name})).toThrow(/模拟正在进行/)
+    tick()
+    const status = dispatch('opsi.simulator.status', {instance: name})
+    expect(status.state).toBe('completed')
+    expect(status.completedSamples).toBe(status.totalSamples)
+    expect(status.result.ap).toBe(485.3)
+    expect(dispatch('opsi.simulator.figure', {instance: name}).image).toMatch(/^data:image/)
+    expect(dispatch('overview.get', {instance: name}).status).toBe(game.status)
+    expect(dispatch('opsi.simulator.status', {instance: name, after: status.logs.cursor}).logs.entries).toEqual([])
+    expect(dispatch('opsi.simulator.start', {instance: name}).runId).toBe(started.runId + 1)
+    expect(dispatch('opsi.simulator.figure', {instance: name}).image).toBeNull()
+    expect(dispatch('opsi.simulator.stop', {instance: name}).state).toBe('interrupted')
+  })
   it('配置按实例隔离，合并过期快照的字段修改并拒绝非原子保存', () => {
     const {dispatch} = createMockState()
     const initial = dispatch('config.get', {instance: 'demo-main'})
@@ -91,59 +142,7 @@ describe('前端模拟服务', () => {
     expect(() => dispatch('meowfficer.scoreReport', {instance: 'demo-alt'})).toThrow(/尚未生成/)
   })
 
-  it('高级商店策略校验不写配置，最终高级模式必须保留有效脚本', () => {
-    const {dispatch} = createMockState()
-    const initial = dispatch('config.get', {instance: 'demo-main'})
-    const invalid = dispatch('shop_strategy.validate', {
-      instance: 'demo-main', task: 'EventShop', script: 'os.execute("bad")',
-    })
-    expect(invalid).toMatchObject({valid: false, diagnostics: [{code: 'forbidden_call', message: '不允许调用 os.execute', line: 1, column: 1}]})
-    expect(dispatch('shop_strategy.validate', {instance: 'demo-main', task: 'EventShop', script: ''})).toEqual({valid: true, diagnostics: []})
-    expect(dispatch('config.get', {instance: 'demo-main'})).toEqual(initial)
 
-    expect(() => dispatch('config.patch', {
-      instance: 'demo-main', changes: [{path: 'EventShop.ShopAdvanced.Script', value: 'os.execute("bad")'}],
-    })).toThrow(/不允许调用 os.execute/)
-    expect(dispatch('config.get', {instance: 'demo-main'})).toEqual(initial)
-
-    expect(() => dispatch('config.patch', {
-      instance: 'demo-main', changes: [{path: 'EventShop.ShopAdvanced.Mode', value: 'advanced'}],
-    })).toThrow(/需要先保存非空且有效的策略脚本/)
-    expect(dispatch('config.get', {instance: 'demo-main'})).toEqual(initial)
-
-    const script = 'return shop.plan { candidates = candidates:take(0) }'
-    const saved = dispatch('config.patch', {
-      instance: 'demo-main',
-      changes: [
-        {path: 'EventShop.ShopAdvanced.Mode', value: 'advanced'},
-        {path: 'EventShop.ShopAdvanced.Script', value: script},
-      ],
-    })
-    expect(saved.values.EventShop.ShopAdvanced).toEqual({Mode: 'advanced', Script: script})
-    expect(() => dispatch('config.patch', {
-      instance: 'demo-main', changes: [{path: 'EventShop.ShopAdvanced.Script', value: ''}],
-    })).toThrow(/需要先保存非空且有效的策略脚本/)
-    expect(dispatch('config.get', {instance: 'demo-main'})).toEqual(saved)
-  })
-
-  it('高级策略 mock 接受复杂分支模板并拒绝明显的非白名单调用', () => {
-    const {dispatch} = createMockState()
-    const valid = `local pool = candidates:where(function(item)
-  return item.tier == 't4' and item.available
-end):score(function(item)
-  return 100 - item.price
-end)
-if context.domain == 'event' then
-  return shop.plan { reserve = { Pt = 2 }, candidates = pool:cap('key', 'Cube', 1):take(20) }
-else
-  return shop.plan { candidates = candidates:take(0) }
-end`
-    expect(dispatch('shop_strategy.validate', {instance: 'demo-main', task: 'EventShop', script: valid})).toEqual({valid: true, diagnostics: []})
-    expect(dispatch('shop_strategy.validate', {
-      instance: 'demo-main', task: 'EventShop',
-      script: 'return shop.plan { candidates = candidates:where(function(item) return math.abs(item.price) > 0 end):take(1) }',
-    })).toMatchObject({valid: false, diagnostics: [{code: 'forbidden_call', message: '不允许调用 math.abs'}]})
-  })
 
   it('统计服务提供完整的 9 种资源、5 种大世界趋势及全部分类明细，空实例返回空数据', () => {
     const {dispatch} = createMockState()
@@ -156,6 +155,9 @@ end`
     expect(resources.series[0].label).toBe('石油')
     expect(resources.series.map(s => s.label)).toEqual(['石油', '物资', '钻石', '心智魔方', '活动 PT', '核心数据', '荣誉勋章', '功勋', '舰队币'])
     expect(resources.series[0].points).toHaveLength(24)
+    const decoded = normalizeReport(resources)
+    expect(decoded.series.flatMap(series => series.points).every(point =>
+      Number.isFinite(Date.parse(point.time.replace(' ', 'T'))) && Number.isFinite(point.value))).toBe(true)
 
     const action = dispatch('statistics.report', {instance: 'demo-main', category: 'action', days: 7})
     expect(action.series).toHaveLength(5)

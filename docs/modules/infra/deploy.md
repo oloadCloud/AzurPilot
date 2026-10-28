@@ -59,6 +59,25 @@ deploy/
 | `python -m deploy.app` | 只重建前端产物 |
 | `deploy/docker/Dockerfile` | 容器构建（多阶段，预装前端产物） |
 
+### 茗交所持久化
+
+所有交易数据统一持久化在 `config/stock-exchange/`：`game.key` 是随机游戏密钥，`registry.json` 保存加密实例登记、文件摘要和历史检查点，同目录保存密文身份、绑定与补传日志。它们不绑定主机、运行用户或项目绝对路径，不需要额外挂载用户 HOME 或提供 Linux `machine-id`。仓库的 Compose 与 Docker 运行示例挂载完整项目目录；迁移完成后只挂载配置目录也能保留交易账户。例如使用 `/app/AzurPilot` 镜像时：
+
+```yaml
+volumes:
+  - ./config:/app/AzurPilot/config:rw
+```
+
+国内 Dockerfile 的工作目录是 `/app/AzurLaneAutoScript`，挂载目标需使用对应路径。新容器运行用户须有数据目录的读写权限；备份、迁移或恢复应停掉服务和 worker，再整体复制配置、中央 SQLite、旧 CL1 统计库与上述游戏数据，避免不同时刻的检查点和历史混用。包含 `game.key` 的备份可解密交易凭据，按私有数据管理。每日自动备份不会覆盖全部交易数据，不能替代这份完整备份。
+
+首次升级须让旧 `cache/stock-exchange/` 可见且可写。检测到旧目录后仅移动文件到 config，支持不同磁盘或容器挂载间的移动；同名冲突静默以默认加载的 config 数据为准，旧 cache 副本被覆盖。搬运后统一执行常规读取、格式升级与校验，文件有问题只在茗交所提示，不阻断正常配置操作。
+
+已有本机保护数据在常规读取时认证并升级，保留原 UUID、私钥、绑定和检查点。旧版应先在原项目路径下升级，再移动部署；升级前需保留原用户密钥目录中的游戏 `.game` 登记和配套 `.key`。Windows 旧密钥须由原用户 DPAPI 解封，Linux 需旧密钥目录可见且文件可读取，容器的 machine-id 变化不阻止升级。若旧容器已被删除且这些文件没有备份，程序无法恢复其加密密钥；可恢复原密钥/登记，也可在茗交所页面查看实际范围并确认完全重建本地账户。重建保留 `config/backup/stock-rebuild-*/` 原件备份；共享数据损坏时须确认所有本地交易账户范围，原远端账户仍保留，新身份不能登录原账户，须用新用户名开户。
+
+macOS 本机部署（Apple Silicon 与 Intel）使用相同的游戏密钥存储，不要求 Keychain、TPM、DPAPI 或机器标识；POSIX 文件权限与跨进程文件锁用于保护持久化读写。`GameDataProtector` 统一解析项目物理路径，兼容 macOS `/var` 等系统路径别名，不放开受保护目录内自定义符号链接的检查。Windows/Linux 数据须先按上述流程升级，再整体迁移 config 到 Mac，继续沿用身份和账户绑定。macOS 上的 Docker 部署同样持久化配置目录。CI 的 `game-data` 任务分别在原生 Apple Silicon、Intel macOS、Windows 与 Linux 执行 `tests.test_game_data`、`tests.test_stock_exchange`、`tests.test_stock_exchange_history` 和 `tests.test_stock_exchange_recovery`；平台专属用例只在对应系统运行。
+
+完整运行环境仍按 `pyproject.toml` 与 `uv.lock` 安装：当前 Apple Silicon 的 ONNX Runtime wheel 最低为 macOS 14，较旧系统不能直接安装这份锁定环境。跨平台依赖预检使用 `MACOSX_DEPLOYMENT_TARGET=14.0 uv sync --frozen --dry-run --python-platform aarch64-apple-darwin`；这只验证安装计划，不替代原生 Mac 上的安装、测试或模拟器验收。茗交所密钥方案本身没有这项 ONNX 系统版本要求。
+
 ## 6. 工作流程
 
 ### 安装器链条
@@ -75,7 +94,33 @@ Alas.bat → python -m deploy.installer
 成功 → start pythonw gui.py --electron
 ```
 
+`GitManager.git_install()` 按本地配置直接执行 Git/CDN 更新，不再请求云端更新总开关。云端仅保留运行期间的强制更新开关，其访问失败不阻止正常版本检查。
+
+### 统一云 API 入口
+
+核心云接口地址集中在 `deploy/api_endpoints.py`，统一使用 `https://api.azurpilot.com`：
+
+| 用途 | 路径与协议 |
+| --- | --- |
+| CL1 月度累计上报 | `POST /api/v2/post/cl1`，UUID、采集时间、原始计数与设备头；派生指标由服务端计算 |
+| 公告 | `GET /api/v2/get/notice/data.json`，读取 `announcement`，撤回时清除本地公告缓存 |
+| 强制更新 | `GET /api/v2/get/update/data.json`，读取布尔字段 `force_update` |
+| 停服维护 | `GET /api/v2/get/maintenance?server=cn`，按当前区服查询；其他服不回退国服 |
+| 单服状态 | `GET /api/v2/get/server?region=cn&server_id=1`，保留网关直连后备逻辑 |
+| 截图 | `/api/v1/uploads/init` 获取 C 的 307 → 直接向 A 登记、逐文件 `PUT /api/v1/uploads/{id}/files/{index}` → `POST /api/v1/uploads/{id}/complete` |
+
+公告和更新策略读取 Worker 的 v2 文档；动态 v2 查询携带 `X-AzurPilot-ID`。已移除的 `/api/updata` 总开关不恢复。
+
+`掉落记录 → 云端统计上报` 控制截图上报（默认开启），具体类型仍按“上传 / 保存并上传”选项决定。科研同时采集五项项目列表与领奖截图；通用掉落沿用既有采集点，侵蚀1练级只保留独立 CL1 统计。云端开关关闭不影响本地统计。临时文件位于 `log/cloud_upload/<匿名实例ID>/`，单文件最多10 MiB、单组500 MiB、暂存512 MiB且最多128组。失败保留同一组ID，下次采集启动工作线程时恢复旧任务；完成回执成功后删除暂存，超过7天的失败任务清理。
+
+源码更新 CDN、远程连接注册、ATX 下载和交易所由各自服务配置管理，使用各自的地址。
+
 ### 启动后的依赖自举
+
+仓库的 `[tool.uv] cache-dir` 与启动器的 `UV_CACHE_DIR` 统一指向项目内 `.uv-cache/`，
+直接执行 `uv run gui.py` 和启动器内部同步均不依赖 Windows 用户全局缓存目录的写权限。
+该目录由 uv 管理并已忽略；不需要修改系统缓存 ACL 或重建 `.venv`。用户显式设置的
+`UV_CACHE_DIR` 或 `--cache-dir` 仍可覆盖项目默认值。
 
 `gui.py` 不直接信任 `.venv`：启动时用 `deploy/uv.py` 的 `dependency_sync_service` 做带超时与重试的依赖同步（pending 状态记录在 `module/runtime/setting.py`，崩溃后下次启动重做）。WebUI 服务有 120 秒就绪超时与最多 3 次重启；运行期检测到依赖标记时同样先同步再拉服务。
 

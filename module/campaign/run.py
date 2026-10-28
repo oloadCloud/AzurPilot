@@ -21,7 +21,7 @@ from module.campaign.campaign_event import CampaignEvent
 from module.campaign.stage_name import normalize_event_stage, normalize_post_loop_stage
 from module.shop.shop_status import ShopStatus
 from module.campaign.campaign_ui import MODE_SWITCH_1
-from module.config.config import AzurLaneConfig
+from module.config.config import AzurLaneConfig, TaskEnd
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
@@ -73,7 +73,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
         Raises:
             RequestHumanTakeover: 地图文件不存在时抛出。
         """
-        if hasattr(self, 'name') and name == self.name:
+        if name == getattr(self, 'name', None) and folder == getattr(self, 'folder', None):
             return False
 
         self.name = name
@@ -96,7 +96,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
                 logger.warning(f'[战役-运行] 现有文件: {files}')
 
             logger.critical(f'[战役] 可能的原因1: 这个活动 ({folder}) 没有 {name}')
-            logger.critical(f'[战役] 可能的原因2: 你使用的Alas版本太旧，请检查更新，或者使用dev_tools/map_extractor.py自行制作地图文件')
+            logger.critical(f'[战役] 可能的原因2: 你使用的AzurPilot版本太旧，请检查更新，或者使用dev_tools/map_extractor.py自行制作地图文件')
             raise RequestHumanTakeover
 
         config = copy.deepcopy(self.config).merge(self.module.Config())
@@ -144,7 +144,12 @@ class CampaignRun(CampaignEvent, ShopStatus):
             self.status_get_gems()
             # 金币限制
             self.get_coin()
-            if self.get_oil() < max(self.config.StopCondition_OilLimitHardFloor, self.config.StopCondition_OilLimit):
+            oil = self.get_oil()
+            runtime = self.config.__dict__.get('_scheduler_runtime')
+            if runtime is not None and runtime.oil_control.target_reached(self.config, oil):
+                logger.hr('石油控制: 已降到目标以下')
+                return True
+            if oil < max(self.config.StopCondition_OilLimitHardFloor, self.config.StopCondition_OilLimit):
                 logger.hr('触发停止条件: 石油上限')
                 self.config.task_delay(minute=(120, 240))
                 return True
@@ -154,6 +159,10 @@ class CampaignRun(CampaignEvent, ShopStatus):
             return True
         # 自动搜索石油限制
         if self.campaign.auto_search_oil_limit_triggered:
+            runtime = self.config.__dict__.get('_scheduler_runtime')
+            if runtime is not None and runtime.oil_control.target_reached(self.config):
+                logger.hr('石油控制: 已降到目标以下')
+                return True
             logger.hr('触发停止条件: 自动搜索石油上限')
             self.config.task_delay(minute=(120, 240))
             return True
@@ -182,31 +191,6 @@ class CampaignRun(CampaignEvent, ShopStatus):
                 logger.hr('触发停止条件: 物资上限')
                 self.handle_task_balancer()
                 return True
-
-        return False
-
-    def _triggered_app_restart(self):
-        """检查是否触发重启条件。
-
-        Returns:
-            bool: 是否触发重启条件。
-        """
-        if not self.campaign.emotion.is_ignore:
-            if self.campaign.emotion.triggered_bug():
-                logger.info('[战役-运行] 触发重启避免情绪bug')
-                return True
-
-        return False
-
-    def handle_app_restart(self):
-        """检查并处理因情绪异常导致的客户端重启。
-
-        Returns:
-            bool: 若触发了重启调用返回 True，否则返回 False。
-        """
-        if self._triggered_app_restart():
-            self.config.task_call('Restart')
-            return True
 
         return False
 
@@ -389,12 +373,35 @@ class CampaignRun(CampaignEvent, ShopStatus):
         Pages:
             in: page_campaign
         """
+        runtime = self.config.__dict__.get('_scheduler_runtime')
+        if runtime is not None and runtime.oil_control.is_farming(self.config):
+            return
         if self.config.is_task_enabled('Commission') and self.campaign.commission_notice_show_at_campaign():
             logger.info('[战役-运行] 发现委托通知')
             self.config.task_call('Commission')
             self.config.task_stop('Commission notice found')
 
-    def run(self, name, folder='campaign_main', mode='normal', total=0):
+    def run(self, name, folder='campaign_main', mode='normal', total=0, resume=False):
+        """完成战役调用后，在同一任务归因范围内核对末轮资源。"""
+        from module.campaign.recovery import CAMPAIGN_RESTART_ERRORS, capture_campaign_recovery
+        from module.statistics.resource_tracking import observe_campaign_end
+        resume = self.__dict__.pop('_resume_campaign_run', False) or resume
+        expected = self.__dict__.pop('_resume_campaign_kwargs', None)
+        if expected is not None and expected != dict(name=name, folder=folder, mode=mode, total=total):
+            self.config.task_stop('任务入口已切换关卡，停止使用原续接断点')
+        try:
+            result = self._run(name, folder=folder, mode=mode, total=total, resume=resume)
+        except CAMPAIGN_RESTART_ERRORS:
+            if hasattr(self, 'campaign'):
+                capture_campaign_recovery(self, dict(name=name, folder=folder, mode=mode, total=total))
+            raise
+        except TaskEnd:
+            observe_campaign_end(self.config, self.device)
+            raise
+        observe_campaign_end(self.config, self.device)
+        return result
+
+    def _run(self, name, folder='campaign_main', mode='normal', total=0, resume=False):
         """运行战役任务主流程。
 
         Args:
@@ -403,11 +410,15 @@ class CampaignRun(CampaignEvent, ShopStatus):
             mode (str): 战役模式，如 `normal` 或 `hard`。默认 'normal'。
             total (int): 总运行次数限制。默认 0。
         """
-        name, folder = self.handle_stage_name(name, folder, mode=mode)
-        self.config.override(Campaign_Name=name, Campaign_Event=folder)
-        self.load_campaign(name, folder=folder)
-        self.run_count = 0
-        self.run_limit = self.config.StopCondition_RunCount
+        if resume:
+            name, folder = self.name, self.folder
+        else:
+            name, folder = self.handle_stage_name(name, folder, mode=mode)
+            self.config.override(Campaign_Name=name, Campaign_Event=folder)
+            self.load_campaign(name, folder=folder)
+            self.run_count = 0
+            self.run_limit = self.config.StopCondition_RunCount
+        resume_map = resume and self.__dict__.pop('_resume_map', False)
         while 1:
             # 结束条件
             if total and self.run_count >= total:
@@ -417,6 +428,7 @@ class CampaignRun(CampaignEvent, ShopStatus):
 
             # 日志
             logger.hr(name, level=1)
+            logger.info(f'Campaign run: event="{folder}", name={name}')
             if self.config.StopCondition_RunCount > 0:
                 logger.info(f'[战役-运行] 剩余次数: {self.config.StopCondition_RunCount}')
             else:
@@ -428,7 +440,12 @@ class CampaignRun(CampaignEvent, ShopStatus):
             if not self.device.has_cached_image:
                 self.device.screenshot()
             self.campaign.device.image = self.device.image
-            if self.campaign.is_in_map():
+            if not resume_map:
+                from module.campaign.fleet_training import recover_reading
+                recover_reading(self, mode)
+            if resume_map:
+                logger.info('[战役续接] 跳过选关与入场，恢复原战役状态循环')
+            elif self.campaign.is_in_map():
                 logger.info('[战役] 已在地图中，执行撤退。')
                 try:
                     self.campaign.withdraw()
@@ -445,11 +462,12 @@ class CampaignRun(CampaignEvent, ShopStatus):
             else:
                 self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
             self.config.override(Campaign_Mode=self.campaign.config.Campaign_Mode)
-            self.disable_raid_on_event()
-            self.handle_commission_notice()
+            if not resume_map:
+                self.disable_raid_on_event()
+                self.handle_commission_notice()
 
             # 如果在困难模式，检查剩余次数
-            if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == 'normal':
+            if not resume_map and self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == 'normal':
                 from module.hard.hard import OCR_HARD_REMAIN
                 remain = OCR_HARD_REMAIN.ocr(self.device.image)
                 if not remain:
@@ -458,8 +476,10 @@ class CampaignRun(CampaignEvent, ShopStatus):
                     break
 
             # 结束条件
-            if self.triggered_stop_condition(oil_check=not self.campaign.is_in_auto_search_menu()):
-                break
+            if self.triggered_stop_condition(oil_check=not resume_map and not self.campaign.is_in_auto_search_menu()):
+                if not resume_map:
+                    break
+                self.campaign._restart_stop_requested = True
 
             # 更新配置
             if len(self.config.modified):
@@ -470,6 +490,12 @@ class CampaignRun(CampaignEvent, ShopStatus):
             self.device.stuck_record_clear()
             self.device.click_record_clear()
             try:
+                self.campaign._resume_after_restart = resume_map
+                from module.campaign.fleet_rotation import preflight_rotation
+                self.campaign._fleet_rotation_preflight = lambda battle: preflight_rotation(self, battle, mode)
+                from module.campaign.fleet_training import after_battle_due
+                self.campaign._fleet_training_after_battle = lambda: after_battle_due(self, mode)
+                resume_map = False
                 self.campaign.run()
             except ScriptEnd as e:
                 logger.hr('脚本结束')

@@ -23,6 +23,9 @@ COUNTER_THRESHOLD = 150
 COUNTER_TOTALS = (500, 350, 100, 50, 40, 30, 20, 15, 10, 5, 4, 2, 1)
 PRICE_THRESHOLD = 230
 PRICE_BACKGROUND_COLOR = (61, 78, 91)
+UNOBTAINED_TAG_COLOR = (255, 72, 72)
+# 角标区域中红底像素占比达到该值即视为“未获得”角标
+UNOBTAINED_TAG_RED_RATIO = 0.4
 if server.server == 'jp':
     COUNTER_LEFT_STRIP = 54
 elif server.server == 'en':
@@ -32,21 +35,11 @@ else:
 
 
 class CounterOcr(Ocr):
-    """活动商店库存计数器 OCR（例如 14/15）。"""
-
     def __init__(self, buttons, lang='azur_lane', letter=(255, 255, 255), threshold=128,
                  alphabet='0123456789/IDSB', name=None):
         super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
 
     def pre_process(self, image):
-        """预处理计数器图像，裁剪掉左侧空白。
-
-        Args:
-            image (np.ndarray): 原始图像。
-
-        Returns:
-            np.ndarray: 裁剪后的二值化图像。
-        """
         mask = color_similarity_2d(image, (255, 255, 255))
         brightness = np.min(mask, axis=0)
         match = np.where(brightness < COUNTER_THRESHOLD)[0]
@@ -122,8 +115,6 @@ class CounterOcr(Ocr):
 
 
 class PriceOcr(Digit):
-    """活动商店价格 OCR。"""
-
     def pre_process(self, image):
         """预处理价格图像，裁切左侧空白。
 
@@ -171,21 +162,11 @@ class EventShopItem(Item):
         return name
 
     def predict_valid(self):
-        """判断商品格是否包含有效商品（非空白或已售空变暗）。
-
-        Returns:
-            bool: 亮度达到阈值返回 True，否则返回 False。
-        """
         luma = rgb2luma(self.image)
-        return np.mean(luma > 127) >= 0.3
+        return np.mean(luma > 127) >= 0.2
 
     @property
     def scroll_pos(self):
-        """获取商品所在的滚动条位置。
-
-        Returns:
-            float | None: 滚动条相对位置值。
-        """
         return self._scroll_pos
 
     @scroll_pos.setter
@@ -235,6 +216,7 @@ class EventShopItem(Item):
                 from module.base.utils import save_image
                 os.mkdir('assets/shop/event/new_templates/') if not os.path.exists('assets/shop/event/new_templates/') else None
                 save_image(self.image, f'assets/shop/event/new_templates/{self.name}.png')
+                # self.name = 'EquipSSR'
 
     def predict_genre(self):
         """使用正则表达式解析物品名称，填充 group、sub_genre 和 tier 属性。"""
@@ -251,8 +233,6 @@ class EventShopItem(Item):
 
 
 class EventShopItemGrid(ItemGrid):
-    """活动商店商品网格处理器。"""
-
     item_class = EventShopItem
 
     def __init__(self,
@@ -283,8 +263,14 @@ class EventShopItemGrid(ItemGrid):
         Returns:
             str | None: 'unobtained' 表示未获得，无对应角标返回 None。
         """
-        color = cv2.mean(np.array(image))[:3]
-        if color_similar(color1=color, color2=(255, 72, 72), threshold=50):
+        image = np.array(image)
+        color = cv2.mean(image)[:3]
+        if color_similar(color1=color, color2=UNOBTAINED_TAG_COLOR, threshold=50):
+            return 'unobtained'
+        # 国际服角标文字“Unobtained”比“未获得”长，白字把平均色拉浅，
+        # 改为统计接近角标红底的像素占比
+        red = color_similarity_2d(image, UNOBTAINED_TAG_COLOR) >= 255 - 50
+        if np.mean(red) >= UNOBTAINED_TAG_RED_RATIO:
             return 'unobtained'
         return None
 

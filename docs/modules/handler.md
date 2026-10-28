@@ -130,9 +130,13 @@ flowchart TD
 
 `UI` 继承 `InfoHandler`，其 `ui_additional()` 是导航/登录循环的统一兜底：按「大世界弹窗 → 通用确认/紧急委托 → 主界面弹窗（`ui_page_main_popups`）→ 剧情跳过 → 游戏提示 → 后宅/指挥喵/准备界面撤退 → 登录相关」的固定优先级逐个尝试，任一返回 `True` 即消费一次循环。`ui_get_current_page()` 与 `ui_goto()` 在识别不到已知页面或需要处理遮挡弹窗时都会调用它。新增「任意页面都可能出现」的弹窗时挂进这条链；只属于特定页面的则留在该任务的循环里。
 
+紧急委托的 `GET_MISSION` 会匹配战败后无可用舰队弹窗的蓝色「确定」。`handle_urgent_commission()` 必须先排除 `FLEET_UNAVAILABLE` 正文并返回 `False`，由战败结算流程确认弹窗、记录结果并等待游戏自动换队；不能仅靠共享按钮推断弹窗身份。详见 [战败与结果记账](defeat-handling.md)。
+
 ### 6.3 登录与重启
 
 `_handle_app_login()` 是单一状态循环：截图 → 检测 `LOGIN_CHECK`（点击并标记登录成功）→ 依次处理安卓无响应、公告、维护、更新、国服协议、回归玩家、通用弹窗、主界面弹窗 → 直到 `is_in_main()` 持续确认（`confirm_timer`）后退出。`handle_app_login()` 在外层把截图间隔放宽到 1 秒，并用 `Restart.LoginWaitTimeout`（跨任务读取，默认 30 秒、上限 3600）覆盖卡死检测阈值，避免慢启动的后台模拟器被误判卡死。
+
+`ui_page_main_popups()` 返回 `True` 只表示本帧已执行操作，登录循环会继续截图，不能直接视为登录完成。自选轻量复刻选择页由该公共入口识别 `CAPSULE_RERUN_CHECK` 后复用 `BACK_ARROW_WHITE` 返回；重启游戏仍可能再次展示，因此需显式退出并持续确认主界面。离线回放见 `tests/test_capsule_rerun_login.py`。
 
 `app_restart()` 是带恢复梯度的重启状态机：
 
@@ -153,6 +157,8 @@ flowchart TD
 进入地图后 `MapOperation`（module/map）按序调用本层：`map_get_info()` 读取通关率/星级/威胁安全并写入 `map_*` 状态、覆盖部分 `MAP_HAS_*` 配置 → `handle_fast_forward()` 切通关模式开关 → `handle_auto_search()`、`handle_auto_search_setting()` → 出击后 `Fleet` 的移动循环中依次调用 `handle_ambush()`、`handle_mystery()`、`handle_walk_out_of_step()`。战斗结束后 `handle_in_map_with_enemy_searching()` / `handle_in_map_no_enemy_searching()` 在等待动画的同时兜底各类弹窗，`handle_in_stage()` 确认回到关卡页面后抛 `CampaignEnd` 终结本次关卡。
 
 ### 6.5 剧情跳过
+
+`InfoHandler.story_skip(drop=None, *, click_interval=2, prefer_skip=False)` 可由领域处理器调整重试间隔和对话跳过策略。大世界 `MapEventHandler` 对所有大世界任务使用 0.5 秒间隔、实例独立计时器及 `prefer_skip=True`；无选项对话点击右上角 `STORY_SKIP`，不修改 `os_init()` 设置的全局剧情配置。游戏世界剧情把选项步骤标为重要步骤，跳过会停在这些选项；快速路径仍逐帧检测选项，在 0.3 秒稳定确认后选择，显式 `STORY_OPTION`、跳过确认弹窗及卡死保护继续生效。大世界之外的通用处理器保留原配置和间隔，领奖界面的空白关闭保持原行为。
 
 `story_skip()` 按优先级处理四类画面：剧情确认弹窗（`story_popup_timeout` 窗口内）、黑底纯文字对话（`STORY_LETTERS_ONLY`）、剧情选项（三套峰值检测适配旧版/新版大白色/右侧白色三种样式）、关闭按钮。选项选择支持 `STORY_OPTION` 指定序号；大世界塞壬装置由 `_identify_siren_device_option()` 按选项数量与跨任务配置识别。每次剧情点击后清空设备点击记录，防止不同剧情段复用同一按钮名触发 `GameTooManyClickError`，卡死改由 `_story_option_click` 连续计数兜底。
 
@@ -181,6 +187,12 @@ flowchart TD
 | module/notify | GemsFarming 无法设置自动搜索时的失败通知 |
 
 ## 8. 数据流
+
+普通主线/活动的「换船调度」任一模式开启并启用共享`SelectedOnly`时，复用原红脸确认按钮及点击间隔，
+但确认前复核培养舰位最低心情，培养充足时可确认固定舰船带来的红脸；培养心情未知或不足
+则取消、退出并使下次入口重新扫描，不清零已知培养高心情。关闭时按全队心情等待，
+红脸沿用计算模式清零保底；两种模式都保持培养心情计算。未启用该策略的任务保留原处理，
+数据密钥弹窗优先处理；卡死/重复点击检测未删除。
 
 ```
 device.screenshot()
@@ -229,7 +241,7 @@ device.screenshot()
 | 异常 | 原因 | 处理 |
 | --- | --- | --- |
 | `CampaignEnd` | `handle_in_stage` 确认回到关卡页面（含短暂页面切换的计时器防误判） | 由战役流程捕获，结束当前关卡；`_emotion_emergency_exit` 内部会捕获 |
-| `ScriptEnd` | calculate 模式出现红脸弹窗的保底（清心情、延时任务）；达到地图成就停止条件 | 上层调度器结束当前任务 |
+| `ScriptEnd` | calculate 模式出现红脸弹窗的保底（从 0 建立有效恢复起点，按出击需求延时任务，恢复后自动重试）；达到地图成就停止条件 | 上层调度器结束当前任务 |
 | `GameTooManyClickError` | 剧情选项连续点击超限、登录中模拟器无响应累计 | 设备层记录，`alas.run` 决定重启 |
 | `GameNotRunningError` | 紧急委托点击后 3–6 秒热更新检测发现进程退出；重启流程 | 调度器触发 Restart 任务 |
 | `EmulatorNotRunningError` | 应用重启 3 次失败且观察期未恢复；重启操作硬超时 | 调度器 `_try_restart_emulator` 重启模拟器 |
@@ -264,9 +276,11 @@ device.screenshot()
 - **点击记录改名技巧**：点击前把 `POPUP_CONFIRM.name` 临时拼上业务名（`POPUP_CONFIRM_XXX`）再还原，让设备层的防连点统计能区分不同来源对同一按钮的点击。新增弹窗处理时沿用该模式，否则可能触发 `GameTooManyClickError` 误报。
 - **类属性地图状态**：`map_*` 是类属性，同一进程内跨任务保留旧值，正确性依赖每次进图时 `map_get_info()`/`handle_fast_forward()` 重置。新增字段必须在 `handle_fast_forward` 的重置分支里覆盖。
 - **剧情与点击记录**：`story_skip` 的 `click_record_clear()` 与 `_story_option_click` 兜底是为绕开「按钮名复用导致防连点误判」而设计的成对机制，单独改动任一侧会重新引入卡死误报。
+- **自律寻敌重试与点击记录**：`handle_os_auto_search_map_option` 开启自律的连续重试（装置探测演出后游戏数秒不响应是常态）同样以 `click_record_clear()` 与 `_os_auto_search_enable_timeout` 预算成对工作；改成只动一侧会让快刷在约 7 秒被防连点阈值误杀，或失去超时兜底而无限重试。
 - **重启相关常量与配置回退**成对出现（如 `RESTART_OPERATION_TIMEOUT` 仅是配置读取失败的兜底），调整时保持「配置优先、非法回退默认并告警」的行为。
 - **assets.py 与 `Mask` 遮罩图**由生成器/资源流程维护，手改会被 CI 差异检查打回。
 - 伏击类模板依赖 `info_letter_preprocess()` 提升信息栏文字对比度，替换识别方式时需保留预处理。
+- **任务列表循环的结算弹窗兜底**：`os_mission_enter()` 与接取委托循环各自带 `AUTO_SEARCH_REWARD` 点击——保留海域中断自律并退出战斗后，「合计获得奖励」会延迟弹出并盖住任务列表。它是与其他大世界循环同一模式但独立的防御分支，删除前先核对各自等待的画面；缺失时界面静止 60 秒被判卡死并强杀重启。
 
 ## 17. 已知限制
 

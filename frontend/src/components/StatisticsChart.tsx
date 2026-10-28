@@ -3,6 +3,7 @@
  */
 
 import type {ReactNode, KeyboardEvent as ReactKeyboardEvent} from 'react'
+import { createPortal } from 'react-dom'
 import { Select } from './FormControls'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts/core'
@@ -11,7 +12,9 @@ import { GridComponent, TooltipComponent, DataZoomComponent, ToolboxComponent, L
 import { CanvasRenderer } from 'echarts/renderers'
 import type {StatSeries} from '../api/types'
 import { Empty } from './ui'
+import {resolveIcon} from './StatisticsTable'
 import {buildSeriesView, isActionPointSeries, riseFallSegments} from './statisticsData'
+import {withTranslatedKeys} from './statisticsText'
 import { useApp } from '../app/context'
 import { usesMaterial } from '../app/theme'
 import {
@@ -25,10 +28,6 @@ import {
 
 echarts.use([LineChart, CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, ToolboxComponent, LegendComponent, CanvasRenderer])
 
-/* 涨跌分段的固定配色。 */
-const RISE_COLOR = '#dc2626'
-const FALL_COLOR = '#16a34a'
-
 const RESOURCE_PALETTE: Record<string, string> = {
   oil: '#10b981', coin: '#f59e0b', cube: '#0ea5e9', gem: '#f43f5e', pt: '#8b5cf6',
   core: '#06b6d4', medal: '#e11d48', merit: '#d97706', guild_coin: '#64748b',
@@ -41,7 +40,8 @@ function getSeriesColor(key: string, index: number, fallback?: string): string {
 }
 
 const iconBase = import.meta.env.BASE_URL
-const chartResourceIcons: Record<string, string> = {
+/* 键为中文名；withTranslatedKeys 补上译名，翻译后的序列名仍能找到图标。 */
+const chartResourceIcons: Record<string, string> = withTranslatedKeys({
   '石油': `${iconBase}oil.webp`,
   '物资': `${iconBase}gold.webp`,
   '钻石': `${iconBase}diamond.webp`,
@@ -59,9 +59,11 @@ const chartResourceIcons: Record<string, string> = {
   '作战补给凭证': `${iconBase}supply_token.webp`,
   '特别兑换凭证': `${iconBase}special_token.webp`,
   '完成委托': `${iconBase}honor_medal.webp`,
-}
+})
 
-function getChartIcon(label: string): string | undefined {
+function getChartIcon(series: StatSeries): string | undefined {
+  if (series.icon) return resolveIcon(series.icon)?.src
+  const {label} = series
   if (chartResourceIcons[label]) return chartResourceIcons[label]
   for (const [key, icon] of Object.entries(chartResourceIcons)) {
     if (label.includes(key) || key.includes(label)) return icon
@@ -100,8 +102,7 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
   onToggleFilter?: (key: string) => void
   expanded?: boolean
   onToggleExpanded: () => void
-  /* 放大视图用当前分区的名字当标题：整页工具栏（含分区切换）被面板盖住后，
-     只写「趋势与细节」就分不出看的是资源趋势还是委托收益。 */
+  /* 放大视图用分区名字当标题：此时整页工具栏（含分区切换）已被面板盖住。 */
   title?: string
   initialMode?: ChartMode
   category?: string
@@ -236,38 +237,83 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
       const colors = getComputedStyle(document.documentElement)
       const text = colors.getPropertyValue('--text').trim() || '#82929f'
       const minimal = !usesMaterial(theme)
-      const primary = minimal ? colors.getPropertyValue('--accent').trim() : '#159b88'
-      const secondary = minimal ? colors.getPropertyValue('--secondary').trim() : '#de7861'
+      const primary = colors.getPropertyValue('--theme-chart-primary').trim() || colors.getPropertyValue('--accent').trim()
+      const secondary = colors.getPropertyValue('--theme-chart-secondary').trim() || colors.getPropertyValue('--secondary').trim()
+      const rise = colors.getPropertyValue('--theme-chart-rise').trim() || '#dc2626'
+      const fall = colors.getPropertyValue('--theme-chart-fall').trim() || '#16a34a'
+      /* 网格线只铺在图表内部那张二级面上，透明度跟随它的不透明度。 */
+      const gridOpacity = Math.min(1, Math.max(0, (parseFloat(colors.getPropertyValue('--theme-plate-alpha')) || 100) / 100))
       const surface = colors.getPropertyValue('--surface').trim()
       const border = colors.getPropertyValue('--border').trim()
       const accentSoft = colors.getPropertyValue('--accent-soft').trim()
-      const signature = `${theme}|${text}|${primary}|${secondary}|${surface}|${border}|${accentSoft}`
+      const signature = `${theme}|${text}|${primary}|${secondary}|${rise}|${fall}|${surface}|${border}|${accentSoft}|${gridOpacity}`
       if (signature === renderedSignature) return
       renderedSignature = signature
       const colorFor = (item: typeof seriesData[number]) => isSingle ? (minimal ? primary : item.color) : item.color
+      /* 观感补全用的整图时间跨度。 */
+      let axisStart = Number.POSITIVE_INFINITY
+      let axisEnd = Number.NEGATIVE_INFINITY
+      for (const item of shownData) {
+        for (const bucket of item.buckets) {
+          const ms = new Date(bucket.time.replace(' ', 'T')).getTime()
+          if (!Number.isFinite(ms)) continue
+          if (ms < axisStart) axisStart = ms
+          if (ms > axisEnd) axisEnd = ms
+        }
+      }
+      const padRange = Number.isFinite(axisStart) && axisEnd > axisStart
+      /* 只补绘制用的点，不改数据、指标与记录。 */
+      const padPairs = (pairs: Array<[number, number]>): Array<[number, number]> => {
+        if (category === 'storage' || !padRange || pairs.length === 0) return pairs
+        const padded: Array<[number, number]> = [...pairs]
+        if (padded[0][0] > axisStart) padded.unshift([axisStart, 0])
+        const last = padded[padded.length - 1]
+        if (last[0] < axisEnd) padded.push([axisEnd, last[1]])
+        return padded
+      }
+      /* 涨跌分段模式下只补下跌段。 */
+      const padFall = (segments: Array<number[] | '-'>): Array<number[] | '-'> => {
+        if (!padRange || segments.length === 0) return segments
+        const pairs = segments.filter((entry): entry is number[] => entry !== '-')
+        if (pairs.length === 0) return segments
+        const padded: Array<number[] | '-'> = [...segments]
+        if (pairs[0][0] > axisStart) padded.unshift([axisStart, 0])
+        const last = pairs[pairs.length - 1]
+        if (last[0] < axisEnd) padded.push([axisEnd, last[1]])
+        return padded
+      }
 
       let yAxes: any[] = []
       if (isSingle || axisMode === 'unified') {
-        yAxes = [{type: 'value', scale: true, splitLine: {lineStyle: {color: border}}, axisLabel: {color: text}}]
-      } else if (shownData.length === 2) {
+        yAxes = [{type: 'value', scale: true, splitLine: {lineStyle: {color: border, opacity: gridOpacity}}, axisLabel: {color: text}}]
+      } else {
         const c0 = colorFor(seriesData[0]), c1 = colorFor(seriesData[1])
         yAxes = [
-          {type: 'value', scale: true, position: 'left', splitLine: {lineStyle: {color: border}}, axisLine: {show: true, lineStyle: {color: c0}}, axisLabel: {color: c0}},
+          {type: 'value', scale: true, position: 'left', splitLine: {lineStyle: {color: border, opacity: gridOpacity}}, axisLine: {show: true, lineStyle: {color: c0}}, axisLabel: {color: c0}},
           {type: 'value', scale: true, position: 'right', splitLine: {show: false}, axisLine: {show: true, lineStyle: {color: c1}}, axisLabel: {color: c1}},
         ]
-      } else {
-        yAxes = seriesData.map((item, idx) => {
-          const color = colorFor(item)
-          if (idx === 0) return {type: 'value', scale: true, position: 'left', splitLine: {lineStyle: {color: border}}, axisLine: {show: true, lineStyle: {color}}, axisLabel: {color}}
-          if (idx === 1) return {type: 'value', scale: true, position: 'right', splitLine: {show: false}, axisLine: {show: true, lineStyle: {color}}, axisLabel: {color}}
-          return {type: 'value', scale: true, show: false, splitLine: {show: false}}
-        })
       }
 
+
+      /* 纵轴固定：下界钉在 0，上界仍由 ECharts 按全量数据算，与「从 0 开始的自适应」同解。 */
       if (zeroBase) yAxes = yAxes.map(axis => ({...axis, min: 0}))
 
       /* 每条曲线落在哪个 Y 轴上：单页与统一轴都用左轴。 */
-      const axisIndexFor = (item: {index: number}) => (isSingle || axisMode === 'unified' ? 0 : Math.min(item.index, yAxes.length - 1))
+      /* 大小轴归属：左轴小值、右轴大值。 */
+      const BIG_AXIS_KEYS = new Set(['asset', 'yellow_coins', 'distance'])
+      const SMALL_AXIS_KEYS = new Set(['ap', 'purple_coins'])
+      const BIG_AXIS_RATIO = 0.05
+      const peakOf = (item: {points: Array<{high?: number; close?: number; value?: number}>}) =>
+        item.points.reduce((max, point) => {
+          const value = point.high ?? point.close ?? point.value
+          return typeof value === 'number' && Number.isFinite(value) ? Math.max(max, Math.abs(value)) : max
+        }, 0)
+      const sessionPeak = Math.max(0, ...shownData.map(peakOf))
+      const axisIndexFor = (item: {series: {key: string}; points: Array<{high?: number; close?: number; value?: number}>}) => {
+        if (isSingle || axisMode === 'unified' || SMALL_AXIS_KEYS.has(item.series.key)) return 0
+        if (BIG_AXIS_KEYS.has(item.series.key)) return 1
+        return sessionPeak > 0 && peakOf(item) >= sessionPeak * BIG_AXIS_RATIO ? 1 : 0
+      }
 
       /* 叠涨时该曲线按涨跌配色：折线分成两段，蜡烛线用涨跌色。 */
       const echartsSeries = shownData.map(item => {
@@ -277,7 +323,7 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
           const bucketMap = new Map(item.buckets.map(b => [b.time, b]))
           if (item.index === 0) {
             const candle = riseFall
-              ? {color: RISE_COLOR, color0: FALL_COLOR, borderColor: RISE_COLOR, borderColor0: FALL_COLOR}
+              ? {color: rise, color0: fall, borderColor: rise, borderColor0: fall}
               : {color: primary, color0: secondary, borderColor: primary, borderColor0: secondary}
             return [{
               name: item.series.label, type: 'candlestick' as const, yAxisIndex: 0,
@@ -296,15 +342,18 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
           /* 拐点同属上涨与下跌两个系列，高亮会在同一坐标叠两个符号。 */
           return [
             {name: item.series.label, type: 'line' as const, yAxisIndex: axisIndexFor(item), showSymbol: false, connectNulls: false,
-              emphasis: {disabled: true}, lineStyle: {width: 2, color: RISE_COLOR}, data: segments.rise},
+              emphasis: {disabled: true}, lineStyle: {width: 2, color: rise}, data: segments.rise},
             {name: item.series.label, type: 'line' as const, yAxisIndex: axisIndexFor(item), showSymbol: false, connectNulls: false,
-              emphasis: {disabled: true}, lineStyle: {width: 2, color: FALL_COLOR}, data: segments.fall},
+              emphasis: {disabled: true}, lineStyle: {width: 2, color: fall}, data: padFall(segments.fall)},
           ]
         }
         return [{
           name: item.series.label, type: 'line' as const, yAxisIndex: axisIndexFor(item),
-          showSymbol: item.points.length < 80, symbolSize: 5, connectNulls: false, lineStyle: {width: 2, color}, itemStyle: {color},
-          data: item.buckets.map(b => [new Date(b.time.replace(' ', 'T')).getTime(), b.close]),
+          showSymbol: item.points.length < 80, symbolSize: 5, connectNulls: false,
+          /* 关闭悬停强调：相交处互相覆盖会看起来在闪。 */
+          emphasis: {disabled: true},
+          lineStyle: {width: 2, color}, itemStyle: {color},
+          data: padPairs(item.buckets.map(b => [new Date(b.time.replace(' ', 'T')).getTime(), b.close] as [number, number])),
         }]
       }).flat()
 
@@ -329,10 +378,11 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
         },
         xAxis: isCandlestick ? {type: 'category', data: categoryTimes, axisLabel: {hideOverlap: true}} : {type: 'time', axisLabel: {hideOverlap: true}},
         yAxis: yAxes,
+        /* 纵轴固定：缩放不过滤数据，纵轴始终按全量数据自动取值，与全图视角用同一套算法。 */
         dataZoom: [
-          {type: 'inside', zoomOnMouseWheel: 'ctrl'},
+          {type: 'inside', zoomOnMouseWheel: 'ctrl', filterMode: zeroBase ? 'none' : 'filter'},
           {
-            type: 'slider', bottom: 16, height: 26,
+            type: 'slider', bottom: 16, height: 26, filterMode: zeroBase ? 'none' : 'filter',
             ...(minimal ? {
               backgroundColor: surface, fillerColor: colors.getPropertyValue('--accent-soft').trim(), borderColor: border,
               dataBackground: {lineStyle: {color: secondary, opacity: 1}, areaStyle: {color: surface, opacity: 1}},
@@ -356,13 +406,14 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
     const observer = new ResizeObserver(() => chart.resize())
     observer.observe(element.current)
     const themeObserver = new MutationObserver(render)
-    themeObserver.observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme', 'data-palette', 'data-color-mode', 'style']})
+    themeObserver.observe(document.documentElement, {attributes: true, /* 不监听 style：指针光效每次移动都写 --mx/--my，会把重绘拖进鼠标热路径并造成闪烁。 */
+      attributeFilter: ['data-theme', 'data-palette', 'data-color-mode', 'style']})
     return () => {
       container.removeEventListener('wheel', onWheel, {capture: true})
       observer.disconnect()
       themeObserver.disconnect()
     }
-  }, [shownData, hasPoints, isCandlestick, axisMode, isSingle, categoryTimes, language, ui, theme, stackedRise, zeroBase])
+  }, [shownData, hasPoints, isCandlestick, axisMode, isSingle, categoryTimes, category, language, ui, theme, stackedRise, zeroBase])
 
 
   /* 图表设置（类型、坐标轴、采样粒度、时间范围）排在图表下方：先看数据，再决定怎么画。 */
@@ -431,11 +482,9 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
   /* 组合页里两张图卡标题相同、分不出是哪一张，带短名前缀后可以区分。 */
   const headingLabel = category === 'resources' ? ui('stats.chartHeading.resources') : category === 'action' ? ui('stats.chartHeading.action') : ui('stats.trendDetails')
 
-  return (
+  const chart = (
     <section className={`panel statistics-chart ${expanded ? 'chart-expanded' : ''}`}>
-      {/* 紧凑主题把标题与「放大查看」上提到页面工具栏：分类切换已经说明了这是什么，
-          面板里再写一遍「趋势与细节」是重复的。但放大视图会盖住整页工具栏（含分区切换），
-          所以放大时必须把标题行放回来，否则只剩 Esc 能退出。 */}
+      {/* 紧凑主题把标题提到页面工具栏；放大视图盖住工具栏，此时必须把标题行放回来。 */}
       {(heading || expanded) && <div className="panel-heading">
         <h2>{expanded && title ? title : headingLabel}</h2>
         <div className="stat-card-actions">{foldControl}<button className="text-button" onClick={onToggleExpanded}>{expanded ? ui('stats.collapseChart') : ui('stats.expandChart')}</button></div>
@@ -457,11 +506,11 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
                 key={item.key} type="button"
                 className={`stat-chip ${active ? 'active' : ''} ${empty ? 'empty' : ''}`}
                 onClick={() => toggleKey(item.key)} onDoubleClick={() => selectOnly(item.key)}
-                title={empty ? ui('stats.noSeriesRecord') : `${item.label} (${active ? '已启用' : '未启用'}，双击仅看此项)`}
+                title={empty ? ui('stats.noSeriesRecord') : ui(active ? 'stats.chipActive' : 'stats.chipInactive', {label: item.label})}
                 disabled={empty}
               >
-                {getChartIcon(item.label) ? (
-                  <img className="stat-chip-icon" src={getChartIcon(item.label)} alt="" width={20} height={20} draggable={false}/>
+                {getChartIcon(item) ? (
+                  <img className="stat-chip-icon" src={getChartIcon(item)} alt="" width={20} height={20} draggable={false}/>
                 ) : (
                   <span className="stat-chip-dot" style={{backgroundColor: active ? color : undefined}}/>
                 )}
@@ -490,18 +539,9 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
         <>
           {isSingle ? (
             <div className="stat-metrics">
-              {[[ui('stats.latest'), single.latest], [ui('stats.change'), single.change], [ui('stats.maximum'), single.maximum], [ui('stats.minimum'), single.minimum], [ui('stats.rawCount'), single.points.length]].map(([label, value]) => {
-                const isChange = label === ui('stats.change')
-                const numVal = Number(value)
-                const diffClass = isChange ? (numVal > 0 ? 'positive' : numVal < 0 ? 'negative' : 'neutral') : ''
-                const formatted = isChange && numVal > 0 ? `+${numVal.toLocaleString(undefined, {maximumFractionDigits: 2})}` : numVal.toLocaleString(undefined, {maximumFractionDigits: 2})
-                return (
-                  <div key={String(label)}>
-                    <span>{label}</span>
-                    <strong className={diffClass}>{formatted}</strong>
-                  </div>
-                )
-              })}
+              {[[ui('stats.latest'), single.latest], [ui('stats.change'), single.change], [ui('stats.maximum'), single.maximum], [ui('stats.minimum'), single.minimum], [ui('stats.rawCount'), single.points.length]].map(([label, value]) => (
+                <div key={String(label)}><span>{label}</span><strong>{Number(value).toLocaleString(undefined, {maximumFractionDigits: 2})}</strong></div>
+              ))}
             </div>
           ) : (
             <div className={`stat-multi-metrics${compact ? ' is-compact' : ''}`}>
@@ -521,8 +561,8 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
                   <div key={item.series.key} className={`stat-metric-row${muted ? ' is-filtered' : ''}${canFilter ? ' is-filterable' : ''}`} {...filterProps}>
                     <span className="stat-metric-name">
                       <span className="stat-metric-icon">
-                        {getChartIcon(item.series.label) ? (
-                          <img className="stat-chip-icon" src={getChartIcon(item.series.label)} alt="" width={20} height={20} draggable={false}/>
+                        {getChartIcon(item.series) ? (
+                          <img className="stat-chip-icon" src={getChartIcon(item.series)} alt="" width={20} height={20} draggable={false}/>
                         ) : (
                           <span className="stat-chip-dot" style={{backgroundColor: item.color}}/>
                         )}
@@ -537,8 +577,8 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
                 ) : (
                   <div key={item.series.key} className={`stat-metric-card${muted ? ' is-filtered' : ''}${canFilter ? ' is-filterable' : ''}`} {...filterProps}>
                     <div className="stat-metric-header">
-                      {getChartIcon(item.series.label) ? (
-                        <img className="stat-chip-icon" src={getChartIcon(item.series.label)} alt="" width={20} height={20} draggable={false}/>
+                      {getChartIcon(item.series) ? (
+                        <img className="stat-chip-icon" src={getChartIcon(item.series)} alt="" width={20} height={20} draggable={false}/>
                       ) : (
                         <span className="stat-chip-dot" style={{backgroundColor: item.color}}/>
                       )}
@@ -560,8 +600,6 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
           {controls}
           {rangeError}
           <p className="panel-note">{ui('stats.chartHint')}</p>
-
-          {/* 原始记录表由页面当卡片渲染，这里只把表投进那张卡留出的容器：数据仍用图表自己的分桶与选中序列算。 */}
         </>
       ) : (
         <>
@@ -572,6 +610,9 @@ export function StatisticsChart({series, heading = true, expanded = false, onTog
       )}
     </section>
   )
+
+  /* 放大态挂到 body：卡片链给每张卡设了 z-index，面板留在卡内会被顶栏盖住。 */
+  return expanded ? createPortal(chart, document.body) : chart
 }
 
 

@@ -3,6 +3,9 @@
 # --------------------
 
 # ==================== Alas ====================
+OpsiExploreCleanup:
+  Scheduler:
+    Enable: false
 
 # ==================== Farm ====================
 
@@ -47,6 +50,10 @@ Reward:
 # ==================== DailyReward ====================
 
 # ==================== DailyMission ====================
+
+LimitChallenge:
+  Scheduler:
+    Enable: false
 
 # ==================== Opsi ====================
 OpsiCrossMonth:

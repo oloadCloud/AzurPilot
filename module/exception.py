@@ -29,6 +29,7 @@
 
 不可恢复错误（需要人工干预）：
     - RequestHumanTakeover: 请求人工接管（配置错误等严重问题）
+    - MindCalculatorScanError: 船坞扫描识别或定位不确定，结束工具任务但不重启模拟器
     - AutoSearchSetError: 自动搜索设置失败
     - HardNotSatisfied: 困难模式前置条件不满足
 
@@ -94,6 +95,10 @@ class CampaignNameError(Exception):
     当配置中的关卡名称无法映射到有效的地图文件时抛出。
     """
     pass
+
+
+class StorageStatisticsError(Exception):
+    """仓库识别或提交失败；保留旧数据，不重启模拟器掩盖识别问题。"""
 
 
 class ScriptError(Exception):
@@ -171,6 +176,14 @@ class RequestHumanTakeover(Exception):
     需要用户手动检查并修正问题。
     """
     pass
+
+
+class MindCalculatorScanError(RequestHumanTakeover):
+    """船坞识别或精确定位无法确认；结束工具任务并保留旧清单，不重启模拟器。"""
+
+
+class FleetManagementError(RequestHumanTakeover):
+    """编队页面、卡面或操作结果未确认；不靠OCR判断，也不通过重启重复换船。"""
 
 
 class AutoSearchSetError(Exception):

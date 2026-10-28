@@ -88,12 +88,12 @@ def check_running_directory():
 
 
 def patch_uiautomator2():
-    """修补 uiautomator2 的资源下载路径。
+    """修补 uiautomator2 的资源下载路径和 ATX Agent URL。
 
-    uiautomator2 默认从 tool.appetizer.io 或 github.com/openatx 下载资源，
-    但这些地址在国内可能不可用或速度慢。因此修补为使用本地缓存 uiautomator2cache/cache。
-
-    同时移除 minicap 安装，因为模拟器不需要它。
+    1. 将资源下载目录从默认路径修补为本地缓存 uiautomator2cache/cache。
+    2. 移除 minicap 安装，因为模拟器不需要它。
+    3. 修复 arm64-v8a 的 atx_agent_url，使其能正确安装 ATX。
+    4. ATX Agent 优先从 atx.azurpilot.com 下载，失败时回退 GitHub。
     """
     cache_dir = site_package_file('uiautomator2cache', 'cache')
     init_file = site_package_file('uiautomator2', 'init.py')
@@ -115,6 +115,47 @@ def patch_uiautomator2():
         logger.info(f'{init_file} minicap_urls patched')
     else:
         logger.info(f'{init_file} minicap_urls no need to patch')
+
+    # 修补 atx_agent_url
+    res = re.search(r"'arm64-v8a': 'atx-agent_\{v}_linux_armv7.tar.gz'", content)
+    if res:
+        content = re.sub(r"'arm64-v8a': 'atx-agent_\{v}_linux_armv7.tar.gz'",
+                         "'arm64-v8a': 'atx-agent_{v}_linux_arm64.tar.gz'",
+                         content)
+        modified = True
+        logger.info(f'{init_file} atx_agent_url patched')
+    else:
+        logger.info(f'{init_file} atx_agent_url no need to patch')
+
+    res = re.search(r"return GITHUB_BASEURL \+ '/atx-agent/releases/download/%s/%s'", content)
+    if res:
+        content = re.sub(
+            r"return GITHUB_BASEURL \+ '/atx-agent/releases/download/%s/%s' % \(\s*__atx_agent_version__,\s*name\.format\(v=__atx_agent_version__\)\)",
+            r"return 'https://atx.azurpilot.com/%s' % (name.format(v=__atx_agent_version__))",
+            content,
+        )
+        modified = True
+        logger.info(f'{init_file} atx_agent_url download link patched to atx.azurpilot.com')
+
+    # 已安装过旧补丁的环境也需要补齐 GitHub 回退。
+    marker = '    github_host = "https://github.com"\n'
+    if "url.startswith('https://atx.azurpilot.com/')" not in content and marker in content:
+        fallback = '''    if url.startswith('https://atx.azurpilot.com/'):
+        from urllib3.exceptions import HTTPError as Urllib3HTTPError
+
+        try:
+            return cache_download(url, filename, storepath=storepath, logger=logger)
+        except (requests.RequestException, Urllib3HTTPError,
+                FileNotFoundError, AssertionError, TypeError, ValueError) as exc:
+            logger.warning('ATX Agent 镜像下载失败，回退 GitHub：%s', exc)
+        github_url = GITHUB_BASEURL + '/atx-agent/releases/download/%s/%s' % (
+            __atx_agent_version__, os.path.basename(url))
+        return cache_download(github_url, filename, storepath=storepath, logger=logger)
+
+'''
+        content = content.replace(marker, fallback + marker, 1)
+        modified = True
+        logger.info(f'{init_file} atx-agent GitHub fallback patched')
 
     # 修补 appdir
     if cache_dir and os.path.exists(cache_dir):

@@ -290,6 +290,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 raise GameTooManyClickError
             if self.appear(RESEARCH_STOP, offset=(20, 20)):
                 # RESEARCH_STOP 是半透明按钮，颜色会随背景变化
+                if available:
+                    from module.statistics.resource_tracking import record_research_cost
+                    record_research_cost(self.config, project)
                 if add_queue:
                     if not self.research_queue_add():
                         self.research_project_started = None
@@ -576,6 +579,10 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         with self.stat.new(
                 genre='research', method=self.config.DropRecord_ResearchRecord
         ) as drop:
+            # Selection/reset frames are already uploaded individually by
+            # research_cloud_list_record. Keep this legacy local archive out of
+            # the completion stream so it cannot duplicate appearance samples.
+            drop.upload = False
             for _ in range(5):
                 if self.get_queue_slot() > 0:
                     success = self.research_queue_append(drop=drop)

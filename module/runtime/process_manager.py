@@ -18,7 +18,7 @@ from rich.console import ConsoleRenderable
 from rich.text import Text
 
 from module.config.utils import DEFAULT_CONFIG_NAME
-from module.logger import logger, set_file_logger, set_func_logger
+from module.logger import logger, set_console_logger, set_file_logger, set_func_logger
 from module.runtime.process_control import is_process_alive, stop_process, stop_process_tree
 from module.runtime.setting import State
 from module.runtime.worker_events import ExitEvent, TaskEvent, WorkerResult
@@ -40,6 +40,25 @@ from module.submodule.utils import (
 )
 
 _STOP_ACTION_UNSET = object()
+
+
+def memory_governs(instance: str) -> bool:
+    """该实例是否由「记忆运行」接管。
+
+    读取失败时按未开启处理，保持原有的缓存清单恢复行为。
+    """
+    try:
+        from module.runtime.startup_memory import get_startup_remember
+        return get_startup_remember(instance)
+    except Exception:
+        logger.warning(f'[WebUI-进程管理] 读取 [{instance}] 的记忆运行开关失败，按缓存清单恢复')
+        return False
+
+
+def prepare_statistics(config_directory=None) -> None:
+    """迁移普通总库；失败中止 worker 启动并保留旧源。"""
+    from module.persistence.database import initialize
+    initialize(config_directory)
 
 
 class ProcessManager:
@@ -183,6 +202,7 @@ class ProcessManager:
                         return
                     if func is None:
                         func = get_config_mod(self.config_name)
+                    prepare_statistics()
                     from module.api.account_service import prepare_worker
                     account_key = prepare_worker(self.config_name)
                     self.started_func = func
@@ -197,6 +217,7 @@ class ProcessManager:
                     self._preview_queue = State.manager.Queue(maxsize=2)
                     self._program_queue = State.manager.Queue(maxsize=2)
                     from module.runtime.preview import hub
+                    from module.persistence.database import current_directory
                     hub.publish(self.config_name, {"instance": self.config_name, "image": None, "capturedAt": None})
                     args = (
                         self.config_name,
@@ -207,6 +228,7 @@ class ProcessManager:
                         self.run_id,
                         account_key,
                         self._program_queue,
+                        str(current_directory()),
                     )
                     process = Process(
                         target=ProcessManager.run_process,
@@ -755,6 +777,7 @@ class ProcessManager:
         run_id: str = None,
         account_key=None,
         program_queue=None,
+        business_directory=None,
     ) -> None:
         """工作子进程的主入口点函数。
 
@@ -768,6 +791,7 @@ class ProcessManager:
             preview_queue: 预览帧队列。
             run_id: 运行轮次 ID。
             account_key: 解密注入的账号密钥。
+            business_directory: 父进程实际使用的普通总库目录。
         """
         from module.runtime.worker_events import initialize
 
@@ -779,6 +803,8 @@ class ProcessManager:
             vault.keys[config_name] = account_key
         result = WorkerResult.ERROR
         try:
+            if business_directory is not None:
+                prepare_statistics(business_directory)
             result = ProcessManager._run_process(config_name, func, q, e, preview_queue, run_id)
         except SystemExit as exc:
             if exc.code in (None, 0):
@@ -829,11 +855,10 @@ class ProcessManager:
 
         # 初始化日志器
         set_file_logger(name=config_name)
+        prepare_statistics()
         if State.electron or os.environ.get("AZURPILOT_TUI") == "1":
-            # 运行于 Electron 或 TUI 终端界面时，移除标准输出处理器避免污染终端渲染
-            from module.logger import console_hdlr
-
-            logger.removeHandler(console_hdlr)
+            # 运行于 Electron 或 TUI 终端界面时，关闭控制台日志避免污染终端渲染
+            set_console_logger(False)
         set_func_logger(func=q.put)
         if preview_queue is not None:
             from module.runtime.preview import initialize
@@ -931,7 +956,7 @@ class ProcessManager:
             instances: 需要重启的实例列表，元素为 ProcessManager 或配置名称字符串。
             ev: 用于通知子进程执行更新的事件对象。
         """
-        logger.hr("[WebUI-进程管理] 重启 Alas")
+        logger.hr("[WebUI-进程管理] 重启 AzurPilot")
 
         # 加载 MOD_CONFIG_DICT
         list_mod_instance()
@@ -951,6 +976,10 @@ class ProcessManager:
             with open("./config/reloadalas", mode="r", encoding="utf-8") as f:
                 for line in f.readlines():
                     line = line.strip()
+                    if line and memory_governs(line):
+                        # 开了记忆运行的实例由启动清单按记忆决定，不由这份更新前缓存恢复
+                        logger.info(f'[WebUI-进程管理] [{line}] 已开启记忆运行，交由启动清单恢复')
+                        continue
                     _instances.add(ProcessManager.get_manager(line))
         except FileNotFoundError:
             pass
@@ -973,4 +1002,4 @@ class ProcessManager:
             os.remove("./config/reloadalas")
         except:
             pass
-        logger.info("[WebUI-进程管理] 启动 Alas 完成")
+        logger.info("[WebUI-进程管理] 启动 AzurPilot 完成")

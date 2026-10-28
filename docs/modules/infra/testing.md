@@ -23,6 +23,8 @@
 - 游戏识别的准确性验证——截图资源驱动的识别改动用已有截图离线人工比对（见 AGENTS.md），不进自动化测试。
 - 真机/实机模拟器联调——属用户授权的实测范畴。
 
+`tests.test_persistence` 和 `tests.test_persistence_migration` 覆盖 v1 STRICT 表、类型化值、部分快照、只读旧源、崩溃重试、WAL 备份及单实例切片。全量测试可设置 `AZURPILOT_CONFIG_DIR` 为临时目录，使无显式目录的普通存储也保持隔离；对应业务测试仍使用各自临时夹具与模拟服务，不连接真实账号。
+
 ## 3. 模块位置
 
 ```
@@ -69,8 +71,9 @@ frontend/
 
 ### 两套 e2e 的分工
 
-- **主配置**：连接真实 Python API（Starlette 起在临时配置上），验证协议、认证、表单保存全链路；跑 `e2e/` 下除 `mock.spec.ts` 外全部用例。
+- **主配置**：连接真实 Python API（Starlette 起在临时配置上），验证协议、认证、表单保存全链路；跑 `e2e/` 下除 `mock.spec.ts` 与 `stock-exchange/` 之外的用例。
 - **mock 配置**：`npm run mock`（22492）+ Vite mock 模式（5174），`state.mjs` 全内存，`AZURPILOT_MOCK_SCENARIO=empty` 可测零实例首启，`AZURPILOT_MOCK_PASSWORD` 测登录；只跑 `mock.spec.ts`。界面交互的快速迭代用这套。
+- **stock 配置**：`npm run test:e2e:stock`，只跑 `stock-exchange/`；交易所 mock 由该配置自行启动，需相邻 `../AzurPilot_StockExchange` 仓库，见 [前端 README](../../../frontend/README.md)。
 
 ### Python 测试的隔离手法
 
